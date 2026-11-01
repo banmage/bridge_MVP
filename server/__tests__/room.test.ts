@@ -162,6 +162,71 @@ describe('房主转移与离开', () => {
     m.markConnected('p-host');
     if (room.seats.S.kind === 'human') expect(room.seats.S.connected).toBe(true);
   });
+
+  it('宽限期内重连取消托管，超时后机器人接管', () => {
+    let clock = 1_000;
+    const m = new RoomManager({ seedBase: 1, codes: ['ABC123'], now: () => clock });
+    const room = m.createRoom(
+      { playerId: 'p-host', name: '房主' },
+      { boards: 12, scoring: 'hcp-points' },
+      'S',
+    );
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+
+    m.markDisconnected('p-host');
+    clock += 30_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(false);
+    m.markConnected('p-host');
+    clock += 120_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(false);
+    expect(room.seats.S.kind).toBe('human');
+
+    m.markDisconnected('p-host');
+    clock += 60_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(true);
+    expect(room.seats.S.kind).toBe('bot');
+    expect(room.match!.seats.S.kind).toBe('bot');
+    expect(room.hostId).toBe('');
+    expect(m.findRoomOf('p-host')).toBeNull();
+  });
+
+  it('房主断线被托管后，房主转给仍在座真人', () => {
+    let clock = 1_000;
+    const m = new RoomManager({ seedBase: 1, codes: ['ABC123'], now: () => clock });
+    const room = m.createRoom(
+      { playerId: 'p-host', name: '房主' },
+      { boards: 12, scoring: 'hcp-points' },
+      'S',
+    );
+    m.joinRoom({ playerId: 'p-2', name: '朋友' }, 'ABC123', 'N');
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+
+    m.markDisconnected('p-host');
+    clock += 60_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(true);
+    expect(room.hostId).toBe('p-2');
+    expect(room.seats.S.kind).toBe('bot');
+    expect(room.seats.N.kind).toBe('human');
+  });
+
+  it('未开赛或关闭超时时不做接管', () => {
+    let clock = 1_000;
+    const m = new RoomManager({ seedBase: 1, codes: ['ABC123'], now: () => clock });
+    const room = m.createRoom(
+      { playerId: 'p-host', name: '房主' },
+      { boards: 12, scoring: 'hcp-points' },
+      'S',
+    );
+    m.markDisconnected('p-host');
+    clock += 120_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(false);
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+    expect(m.takeoverExpired(room, 0)).toBe(false);
+    expect(room.seats.S.kind).toBe('human');
+  });
 });
 
 describe('座位配置与开赛校验', () => {

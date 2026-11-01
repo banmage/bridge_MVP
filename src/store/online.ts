@@ -203,6 +203,26 @@ export const useOnlineStore = defineStore('online', {
           return;
         }
         case 'error': {
+          // 同一身份在另一个窗口/标签页连接：服务端会以新连接为准并踢掉旧连接。
+          // 旧连接必须停止自动重连，否则两个窗口会互相“踢下线”形成循环。
+          if (message.code === 'DUPLICATE_SESSION') {
+            onlineSocket.close();
+            this.connection = 'closed';
+            this.error = { code: message.code, message: message.message, at: Date.now() };
+            this.toasts = [
+              ...this.toasts.slice(-4),
+              {
+                id: Date.now() + Math.random(),
+                message: '该身份已在其他窗口连接，本窗口已断开',
+                level: 'warn',
+              },
+            ];
+            return;
+          }
+          if (message.code === 'ROOM_NOT_FOUND') {
+            this.room = null;
+            this.records = {};
+          }
           // 比赛刚结束的瞬间，可能仍有基于旧快照的迟到动作；
           // 此时服务端已广播 finished，忽略对应的 WRONG_PHASE 提示，避免误导玩家。
           if (this.room?.status === 'finished' && message.code === 'WRONG_PHASE') return;

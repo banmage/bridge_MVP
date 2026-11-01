@@ -43,6 +43,7 @@ const MIME: Record<string, string> = {
 
 const hub = new GameHub({
   aiDelayMs: Number(process.env.AI_DELAY_MS ?? 700),
+  takeoverMs: Number(process.env.BOT_TAKEOVER_MS ?? 60_000),
   rooms: new RoomManager({
     autoNextMs: Number(process.env.AUTO_NEXT_MS ?? 10_000),
   }),
@@ -156,7 +157,7 @@ const server = createServer((req, res) => {
   serveStatic(req, res, url.pathname);
 });
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
 interface AuthedSocket extends WebSocket {
   playerId?: string;

@@ -29,6 +29,8 @@ export interface GameHubOptions {
   now?: () => number;
   /** 机器人行动间隔（毫秒） */
   aiDelayMs?: number;
+  /** 开赛后断线托管宽限期（毫秒，0 表示关闭） */
+  takeoverMs?: number;
   /** 用来覆盖测试中的定时器（默认 setTimeout） */
   setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
@@ -66,6 +68,7 @@ export class GameHub {
   private readonly persisted = new Set<string>();
   private readonly now: () => number;
   private readonly aiDelayMs: number;
+  private readonly takeoverMs: number;
   private readonly setTimer: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly persist: boolean;
@@ -74,6 +77,7 @@ export class GameHub {
     this.rooms = options.rooms ?? new RoomManager();
     this.now = options.now ?? Date.now;
     this.aiDelayMs = options.aiDelayMs ?? 700;
+    this.takeoverMs = options.takeoverMs ?? 60_000;
     this.setTimer = options.setTimer ?? setTimeout;
     this.clearTimer = options.clearTimer ?? clearTimeout;
     this.persist = options.persist ?? true;
@@ -309,20 +313,23 @@ export class GameHub {
    * 广播 / AI 调度 / 自动开副
    * ---------------------------------------------------------------- */
 
-  /** 每秒调用：处理结算后 10 秒自动开下一副 */
+  /** 每秒调用：自动开下一副 + 断线超时托管 */
   tick(): void {
     for (const room of this.rooms.rooms.values()) {
       if (room.status !== 'playing' || !room.match) continue;
+      let changed = false;
       if (room.nextBoardAt !== null && this.now() >= room.nextBoardAt) {
         room.nextBoardAt = null;
         try {
           room.match.nextBoard();
+          changed = true;
         } catch {
           room.status = room.match.status === 'finished' ? 'finished' : room.status;
           continue;
         }
-        this.afterAction(room);
       }
+      if (this.rooms.takeoverExpired(room, this.takeoverMs)) changed = true;
+      if (changed) this.afterAction(room);
     }
   }
 

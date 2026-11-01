@@ -81,6 +81,8 @@ export class RoomManager {
   private readonly referenceScores?: (input: ReferenceInput) => number[];
   private readonly now: () => number;
   private readonly autoNextMs: number;
+  /** 断线起始时间：playerId → epoch ms（不进入视角快照） */
+  private readonly awaySince = new Map<string, number>();
 
   constructor(options: RoomManagerOptions = {}) {
     this.seedBase = options.seedBase;
@@ -172,6 +174,7 @@ export class RoomManager {
       // 重连：恢复在线状态，不改变座位
       const current = room.seats[existing];
       if (current.kind === 'human') current.connected = true;
+      this.awaySince.delete(player.playerId);
       room.updatedAt = this.now();
       return room;
     }
@@ -201,6 +204,7 @@ export class RoomManager {
   leaveRoom(playerId: string, code?: string): Room | null {
     const room = code ? this.getRoom(code) : this.findRoomOf(playerId);
     if (!room) throw new MatchError('NOT_IN_ROOM', '你不在任何房间中');
+    this.awaySince.delete(playerId);
 
     const seat = this.seatOf(room, playerId);
     room.joinOrder = room.joinOrder.filter((id) => id !== playerId);
@@ -230,6 +234,7 @@ export class RoomManager {
     if (seat) {
       const current = room.seats[seat];
       if (current.kind === 'human') current.connected = false;
+      this.awaySince.set(playerId, this.now());
       room.updatedAt = this.now();
     }
     return room;
@@ -242,9 +247,36 @@ export class RoomManager {
     if (seat) {
       const current = room.seats[seat];
       if (current.kind === 'human') current.connected = true;
+      this.awaySince.delete(playerId);
       room.updatedAt = this.now();
     }
     return room;
+  }
+
+  /**
+   * 开赛后断线超时托管：超过 `timeoutMs` 未重连的真人座位转为机器人，
+   * 防止永久离线玩家卡住比赛。返回是否发生了接管。
+   */
+  takeoverExpired(room: Room, timeoutMs: number): boolean {
+    if (room.status !== 'playing' || !room.match || timeoutMs <= 0) return false;
+    const now = this.now();
+    let changed = false;
+    for (const seat of POSITIONS) {
+      const current = room.seats[seat];
+      if (current.kind !== 'human' || current.connected) continue;
+      const since = this.awaySince.get(current.playerId);
+      if (since === undefined) {
+        this.awaySince.set(current.playerId, now);
+        continue;
+      }
+      if (now - since < timeoutMs) continue;
+      room.joinOrder = room.joinOrder.filter((id) => id !== current.playerId);
+      this.awaySince.delete(current.playerId);
+      this.takeover(room, seat);
+      changed = true;
+    }
+    if (changed) room.updatedAt = now;
+    return changed;
   }
 
   /* ---------------------------------------------------------------- *
@@ -441,12 +473,27 @@ export class RoomManager {
   private takeover(room: Room, seat: Position): void {
     const current = room.seats[seat];
     const name = current.kind === 'human' ? current.name : '玩家';
+    const previousPlayerId = current.kind === 'human' ? current.playerId : null;
     const persona = defaultPersonaFor(`${name}的托管`, `takeover-${seat}-${this.now()}`);
     room.seats[seat] = { kind: 'bot', persona };
     if (room.match) {
       room.match.takeoverSeat(seat, persona);
       room.match.seats = { ...room.match.seats };
     }
+    if (previousPlayerId && room.hostId === previousPlayerId) {
+      this.reassignHost(room);
+    }
+  }
+
+  /** 房主失效后转给仍在座的真人家；无真人时置空，避免“幽灵房主”找回房间 */
+  private reassignHost(room: Room): void {
+    const next = room.joinOrder.find((id) =>
+      POSITIONS.some((pos) => {
+        const seat = room.seats[pos];
+        return seat.kind === 'human' && seat.playerId === id;
+      }),
+    );
+    room.hostId = next ?? '';
   }
 
   private requirePlayingRoom(playerId: string, code: string): Room {

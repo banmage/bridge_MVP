@@ -217,6 +217,51 @@ describe('房间与开赛', () => {
     void a;
   });
 
+  it('开赛后断线超过宽限期，tick 触发机器人托管', () => {
+    let now = 1_000;
+    const rooms = new RoomManager({ seedBase: 1, codes: ['ROOM01'], now: () => now });
+    const hub = new GameHub({
+      rooms,
+      persist: false,
+      aiDelayMs: 0,
+      takeoverMs: 60_000,
+      now: () => now,
+      setTimer: () => 0 as unknown as ReturnType<typeof setTimeout>,
+      clearTimer: () => undefined,
+    });
+    const a = connect(hub, 'p-1', 'Alice');
+    hub.receive('p-1', { v: 1, t: 'createRoom', config: { boards: 12, scoring: 'mp' }, seat: 'S' });
+    for (const seat of ['N', 'E', 'W'] as const) {
+      hub.receive('p-1', {
+        v: 1,
+        t: 'setSeat',
+        seat,
+        occupant: {
+          kind: 'bot',
+          persona: {
+            id: `b-${seat}`,
+            name: `${seat}机器人`,
+            risk: 'normal',
+            system: 'precision',
+            conventions: [],
+            randomness: 0,
+          },
+        },
+      });
+    }
+    hub.receive('p-1', { v: 1, t: 'startMatch' });
+    hub.disconnect('p-1');
+    const room = rooms.getRoom('ROOM01');
+    expect(room.seats.S.kind).toBe('human');
+
+    now += 60_000;
+    hub.tick();
+    expect(room.seats.S.kind).toBe('bot');
+    expect(room.match!.seats.S.kind).toBe('bot');
+    expect(room.hostId).toBe('');
+    void a;
+  });
+
   it('ping 返回 pong', () => {
     const { hub } = setup();
     const a = connect(hub, 'p-1', 'Alice');
