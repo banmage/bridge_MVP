@@ -65,6 +65,12 @@
 - [x] T039 手工联调：单人 3 机器人 12 副；双真人 + 2 机器人 12 副；断线重连
 - [x] T040 规格/计划/记录一致性复查（宪法 Check）
 
+## Phase 8: 评审硬化（CR）
+
+- [x] T041 多窗口互踢：`DUPLICATE_SESSION` 后停止自动重连并提示；补在线 store 测试
+- [x] T042 开赛后断线超时托管：`BOT_TAKEOVER_MS`、房主转移、ticker 接入；补房间/协议测试
+- [x] T043 失效房间清理（`ROOM_NOT_FOUND`）、WebSocket 64KB 单帧上限、交付文档基线 `docs/online-mvp/`
+
 ## 依赖关系
 
 - Phase 2 阻塞 Phase 3/5。
@@ -85,8 +91,8 @@
 
 ## 完成记录
 
-- **自动化检查（2026-11-01）**：
-  - `npm test`：33 个测试文件、**347 tests passed**（含服务端 `match/view/room/reference/persistence/protocolHandlers` 与共享 `matchSchedule`）。
+- **自动化检查（2026-11-01，含 T041–T043 硬化回归）**：
+  - `npm test`：34 个测试文件、**358 tests passed**（含服务端 `match/view/room/reference/persistence/protocolHandlers`、共享 `matchSchedule` 与客户端 `online` store）。
   - `npm run typecheck`、`npm run typecheck:server`、`npm run build` 全部通过。
 - **T039 手工联调**：
   - 单人 + 3 机器人：12 副完整跑通，成绩页与逐副复盘正常；
@@ -96,3 +102,5 @@
     客户端在比赛已 `finished` 时忽略该提示，避免误导（`src/store/online.ts`）。
 - **T040 宪法复查**：权威校验、视角隔离、规则单点复用、全量可复盘、AI 同权、确定性、增量交付均满足，
   与 `plan.md` 的 Constitution Check 一致。
+- **T041–T043 评审硬化**：多窗口互踢循环、开赛后断线超时托管、失效房间清理与 WS 单帧上限已合入并回归；
+  交付文档基线见 `docs/online-mvp/`。

@@ -137,9 +137,10 @@ src/
 
 | 规格 | 实现位置 | 测试 |
 |------|----------|------|
-| FR-001/006 | `server/room.ts`、`view.ts` | `room.test.ts` 重连 |
+| FR-001/006/027 | `server/room.ts`、`view.ts`、`store/online.ts` | `room.test.ts`、`protocolHandlers.test.ts`、`online.test.ts` |
 | FR-002/005 | `server/room.ts`、`shared/protocol.ts` | `room.test.ts` |
 | FR-003/004 | `server/room.ts`、`SeatConfigPanel.vue` | `room.test.ts` |
+| FR-007 | `server/room.ts`、`server/protocolHandlers.ts` | `room.test.ts`、`protocolHandlers.test.ts` |
 | FR-008..011 | `server/personas.ts`、`server/match.ts` | `match.test.ts` 人格/节奏 |
 | FR-012/013 | `shared/matchSchedule.ts`、`server/match.ts` | `match.test.ts` 轮转/种子复现 |
 | FR-014..016 | `server/match.ts` + `core/*` | `match.test.ts` 非法动作 |

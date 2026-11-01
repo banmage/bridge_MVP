@@ -124,7 +124,9 @@ src/
 4. 比赛结束显示逐副成绩、累计 IMP/点数/MP%，并可打开任意一副复盘。
 
 设备身份（`playerId + token`）保存在浏览器 `localStorage`，刷新或断线后自动用同一身份重连，
-未开赛时可回到原座位；开赛后主动离开的座位由机器人接管，保证比赛可以打完。
+未开赛时可回到原座位；开赛后主动离开的座位立即由机器人接管，断线座位在
+`BOT_TAKEOVER_MS`（默认 60 秒）后由机器人接管，保证比赛可以打完。同一身份在多个窗口
+打开时以最新连接为准，旧窗口会断开并停止自动重连。
 
 ### 服务端权威与视角隔离
 
@@ -136,6 +138,7 @@ src/
 
 报文与错误码见 [`specs/001-online-pair-game/contracts/protocol.md`](specs/001-online-pair-game/contracts/protocol.md)，
 HTTP 接口见 [`contracts/http-api.md`](specs/001-online-pair-game/contracts/http-api.md)。
+完整的需求基线、计划、设计、编码规范、评审与运行手册见 [`docs/online-mvp/`](docs/online-mvp/README.md)。
 
 ### 机器人人格
 
@@ -180,6 +183,7 @@ HTTP 接口见 [`contracts/http-api.md`](specs/001-online-pair-game/contracts/ht
 | `HOST` | `0.0.0.0` | 监听地址 |
 | `AI_DELAY_MS` | `700` | 机器人每次动作的思考延迟 |
 | `AUTO_NEXT_MS` | `10000` | 一副结算后自动开下一副的等待时间 |
+| `BOT_TAKEOVER_MS` | `60000` | 开赛后断线托管宽限期；`0` 表示关闭 |
 | `MATCH_DATA_DIR` | `server/data/matches` | 比赛记录目录 |
 
 ### 部署
