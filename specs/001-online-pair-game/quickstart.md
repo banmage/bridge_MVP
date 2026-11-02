@@ -66,7 +66,8 @@ curl -s localhost:8787/api/matches/<id> | jq '.match.boards[0]'
 ```
 
 落盘位置：`server/data/matches/<id>.json`（已被 `.gitignore` 忽略；可用 `MATCH_DATA_DIR` 覆盖）。
-仅当比赛完整打完后写入，进行中的对局依靠客户端快照复盘。
+仅当比赛完整打完后写入。开赛后未结束的房间另存 `server/data/rooms/<code>.json`
+（`ROOM_DATA_DIR` 可覆盖），进程重启后自动恢复。
 
 ## 7. 环境变量
 
@@ -78,6 +79,7 @@ curl -s localhost:8787/api/matches/<id> | jq '.match.boards[0]'
 | `AUTO_NEXT_MS` | `10000` | 结算后自动开下一副的等待时间 |
 | `BOT_TAKEOVER_MS` | `60000` | 开赛后断线托管宽限期；`0` 关闭 |
 | `MATCH_DATA_DIR` | `server/data/matches` | 比赛记录目录 |
+| `ROOM_DATA_DIR` | `server/data/rooms` | 进行中房间快照目录 |
 
 ## 8. 常见问题
 

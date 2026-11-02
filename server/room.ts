@@ -16,6 +16,7 @@ import { MatchEngine, MatchError, type BoardRecord, type EngineSeat } from './ma
 import type { ReferenceInput } from './match';
 import { defaultPersonaFor, sanitizePersona } from './personas';
 import { simulateReferenceScores } from './reference';
+import { roomFromSnapshot, type RoomSnapshot } from './roomSnapshot';
 
 /**
  * 房间生命周期：建房、加入、座位、房主转移、开赛、离开/机器人接管。
@@ -90,6 +91,35 @@ export class RoomManager {
     this.referenceScores = options.referenceScores ?? simulateReferenceScores;
     this.now = options.now ?? Date.now;
     this.autoNextMs = options.autoNextMs ?? 10_000;
+  }
+
+  /**
+   * 从磁盘快照恢复房间。进程重启后所有连接均已断开：
+   * 真人座位先标记离线，并重新开始 `BOT_TAKEOVER_MS` 倒计时；
+   * 客户端重连后由 `markConnected` 清除计时。
+   */
+  restoreRooms(snapshots: RoomSnapshot[]): number {
+    let restored = 0;
+    for (const snapshot of snapshots) {
+      try {
+        const room = roomFromSnapshot(snapshot, {
+          ...(this.referenceScores ? { referenceScores: this.referenceScores } : {}),
+        });
+        if (this.rooms.has(room.code)) continue;
+        for (const pos of POSITIONS) {
+          const seat = room.seats[pos];
+          if (seat.kind === 'human') {
+            seat.connected = false;
+            this.awaySince.set(seat.playerId, this.now());
+          }
+        }
+        this.rooms.set(room.code, room);
+        restored += 1;
+      } catch {
+        // 单条快照损坏不影响其他房间恢复
+      }
+    }
+    return restored;
   }
 
   /* ---------------------------------------------------------------- *

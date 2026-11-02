@@ -8,6 +8,7 @@ import { scheduleTable } from '../shared/matchSchedule';
 import { getMatchRecord, listMatches, matchesForPlayer } from './persistence';
 import { GameHub, type ClientTransport } from './protocolHandlers';
 import { RoomManager } from './room';
+import { loadRoomSnapshots } from './roomSnapshot';
 
 /**
  * HTTP + WebSocket 入口。
@@ -41,13 +42,23 @@ const MIME: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
+const rooms = new RoomManager({
+  autoNextMs: Number(process.env.AUTO_NEXT_MS ?? 10_000),
+});
+const restoredRooms = rooms.restoreRooms(loadRoomSnapshots());
+
 const hub = new GameHub({
   aiDelayMs: Number(process.env.AI_DELAY_MS ?? 700),
   takeoverMs: Number(process.env.BOT_TAKEOVER_MS ?? 60_000),
-  rooms: new RoomManager({
-    autoNextMs: Number(process.env.AUTO_NEXT_MS ?? 10_000),
-  }),
+  rooms,
 });
+
+// 恢复的进行中房间立即续跑机器人/下一副；无客户端时也能继续推进。
+hub.resume();
+if (restoredRooms > 0) {
+  // eslint-disable-next-line no-console
+  console.log(`[bridge] restored ${restoredRooms} in-progress room(s)`);
+}
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);

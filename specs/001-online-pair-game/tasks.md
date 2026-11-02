@@ -71,6 +71,14 @@
 - [x] T042 开赛后断线超时托管：`BOT_TAKEOVER_MS`、房主转移、ticker 接入；补房间/协议测试
 - [x] T043 失效房间清理（`ROOM_NOT_FOUND`）、WebSocket 64KB 单帧上限、交付文档基线 `docs/online-mvp/`
 
+## Phase 9: 进行中房间快照与重启恢复（R-06）
+
+- [x] T044 `server/roomSnapshot.ts`：房间/比赛引擎快照、原子写、读取校验与删除
+- [x] T045 `MatchEngine.snapshot/restore` + 可序列化 AI 随机状态，保证重启后续跑一致
+- [x] T046 `RoomManager.restoreRooms` + `GameHub.resume`：恢复座位/当前副、重置托管宽限、续跑 AI 与下一副
+- [x] T047 `server/__tests__/roomSnapshot.test.ts`：落盘/恢复/托管/损坏跳过/引擎续跑/GameHub 重连
+- [x] T048 文档同步：`ROOM_DATA_DIR`、重启恢复流程、评审与验收记录
+
 ## 依赖关系
 
 - Phase 2 阻塞 Phase 3/5。
@@ -104,3 +112,10 @@
   与 `plan.md` 的 Constitution Check 一致。
 - **T041–T043 评审硬化**：多窗口互踢循环、开赛后断线超时托管、失效房间清理与 WS 单帧上限已合入并回归；
   交付文档基线见 `docs/online-mvp/`。
+- **T044–T048 重启恢复（R-06 / CR-006，2026-11-02）**：
+  - `roomSnapshot.ts` 原子写进行中房间；`MatchEngine.snapshot/restore` 保存当前副、已完成副与 AI 随机状态；
+  - 启动时 `RoomManager.restoreRooms` + `GameHub.resume` 恢复房间并按原节奏续跑；真人重连回到原座位，
+    无人重连座位重新计时后托管；正式记录落盘成功后删除快照；
+  - `npm test`：35 个测试文件、**363 tests passed**；`npm run typecheck`、`npm run typecheck:server`、
+    `npm run build` 全部通过；
+  - 文档同步：README、`docs/联网对战.md`、`docs/online-mvp/01..07`、quickstart、spec（FR-028）。

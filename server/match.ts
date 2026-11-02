@@ -103,6 +103,8 @@ export interface ReferenceInput {
   index: number;
 }
 
+export type MatchStatus = 'idle' | 'playing' | 'finished';
+
 export interface MatchEngineOptions {
   config: MatchConfig;
   seats: Record<Position, EngineSeat>;
@@ -110,6 +112,19 @@ export interface MatchEngineOptions {
   referenceScores?: (input: ReferenceInput) => number[];
   /** 测试用：固定 AI 随机源 */
   rngFactory?: (seed: number) => () => number;
+}
+
+/** 进行中比赛的可落盘快照（不含任何仅存于内存的闭包） */
+export interface MatchEngineSnapshot {
+  config: MatchConfig;
+  seats: Record<Position, EngineSeat>;
+  board: BoardState | null;
+  completed: BoardRecord[];
+  status: MatchStatus;
+  startedAt: number;
+  finishedAt: number | null;
+  /** mulberry32 内部状态；自定义随机源可能为 null */
+  rngState: number | null;
 }
 
 const SIMPLE_ORDER: Position[] = ['N', 'E', 'S', 'W'];
@@ -134,7 +149,7 @@ export class MatchEngine {
   seats: Record<Position, EngineSeat>;
   board: BoardState | null = null;
   completed: BoardRecord[] = [];
-  status: 'idle' | 'playing' | 'finished' = 'idle';
+  status: MatchStatus = 'idle';
   startedAt = Date.now();
   finishedAt: number | null = null;
 
@@ -148,6 +163,52 @@ export class MatchEngine {
     this.seats = opts.seats;
     this.referenceScores = opts.referenceScores;
     this.rngFactory = opts.rngFactory ?? makeRng;
+  }
+
+  /** 生成可 JSON 落盘的完整快照（含当前副、已完成副与 AI 随机状态） */
+  snapshot(): MatchEngineSnapshot {
+    return {
+      config: deepCopy(this.config),
+      seats: deepCopy(this.seats),
+      board: this.board ? deepCopy(this.board) : null,
+      completed: deepCopy(this.completed),
+      status: this.status,
+      startedAt: this.startedAt,
+      finishedAt: this.finishedAt,
+      rngState: readRngState(this.rng),
+    };
+  }
+
+  /** 从快照恢复引擎；随机源从当前副 seed 重建后回填状态 */
+  static restore(
+    snapshot: MatchEngineSnapshot,
+    opts: {
+      referenceScores?: (input: ReferenceInput) => number[];
+      rngFactory?: (seed: number) => () => number;
+    } = {},
+  ): MatchEngine {
+    if (!snapshot || !snapshot.config || !snapshot.seats) {
+      throw new Error('比赛快照不完整');
+    }
+    const engine = new MatchEngine({
+      config: deepCopy(snapshot.config),
+      seats: deepCopy(snapshot.seats),
+      ...(opts.referenceScores ? { referenceScores: opts.referenceScores } : {}),
+      ...(opts.rngFactory ? { rngFactory: opts.rngFactory } : {}),
+    });
+    engine.board = snapshot.board ? deepCopy(snapshot.board) : null;
+    engine.completed = deepCopy(snapshot.completed ?? []);
+    engine.status = snapshot.status;
+    engine.startedAt = snapshot.startedAt;
+    engine.finishedAt = snapshot.finishedAt ?? null;
+    engine.finalized = engine.board?.phase === 'scored';
+    if (engine.board) {
+      engine.rng = engine.rngFactory(engine.board.seed);
+      if (snapshot.rngState !== null && snapshot.rngState !== undefined) {
+        writeRngState(engine.rng, snapshot.rngState);
+      }
+    }
+    return engine;
   }
 
   /* ---------------------------------------------------------------- *
@@ -592,6 +653,16 @@ export class MatchEngine {
 /* ------------------------------------------------------------------ *
  * 小工具
  * ------------------------------------------------------------------ */
+
+function readRngState(rng: () => number): number | null {
+  const candidate = rng as { getState?: () => number };
+  return typeof candidate.getState === 'function' ? candidate.getState() : null;
+}
+
+function writeRngState(rng: () => number, state: number): void {
+  const candidate = rng as { setState?: (value: number) => void };
+  candidate.setState?.(state);
+}
 
 function suitOfCard(card: number): 0 | 1 | 2 | 3 {
   return Math.floor(card / 13) as 0 | 1 | 2 | 3;

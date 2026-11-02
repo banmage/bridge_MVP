@@ -8,6 +8,7 @@ import {
 import { MatchError } from './match';
 import { recordFromRoom, saveMatchRecord } from './persistence';
 import { normalizeName, RoomManager, type Room } from './room';
+import { deleteRoomSnapshot, saveRoomSnapshot } from './roomSnapshot';
 import { projectRoomView } from './view';
 
 /**
@@ -126,6 +127,7 @@ export class GameHub {
       client.roomCode = room.code;
       this.broadcast(room);
       this.scheduleAi(room);
+      this.snapshotRoom(room);
     }
     return true;
   }
@@ -137,7 +139,28 @@ export class GameHub {
     if (transport && client.transport !== transport) return;
     this.clients.delete(playerId);
     const room = this.rooms.markDisconnected(playerId);
-    if (room) this.broadcast(room);
+    if (room) {
+      this.broadcast(room);
+      this.snapshotRoom(room);
+    }
+  }
+
+  /**
+   * 启动时调用：恢复房间后立即续跑机器人、处理已到期的下一副，
+   * 并重试保存已结束但未成功落盘的比赛。
+   */
+  resume(): void {
+    for (const room of this.rooms.rooms.values()) {
+      if (!room.match) continue;
+      if (room.status === 'finished') {
+        this.persistRoom(room);
+        continue;
+      }
+      if (room.status === 'playing') {
+        this.scheduleAi(room);
+      }
+    }
+    this.tick();
   }
 
   closeAll(): void {
@@ -208,6 +231,7 @@ export class GameHub {
         if (room) {
           this.rooms.renamePlayer(room, client.playerId, client.name);
           this.broadcast(room);
+          this.snapshotRoom(room);
         } else {
           client.transport.send({
             v: PROTOCOL_VERSION,
@@ -237,12 +261,19 @@ export class GameHub {
         client.roomCode = room.code;
         this.broadcast(room);
         this.scheduleAi(room);
+        this.snapshotRoom(room);
         return;
       }
       case 'leaveRoom': {
+        const previousCode = client.roomCode;
         const room = this.rooms.leaveRoom(client.playerId, client.roomCode ?? undefined);
         client.roomCode = null;
-        if (room) this.broadcast(room);
+        if (room) {
+          this.broadcast(room);
+          this.snapshotRoom(room);
+        } else if (previousCode) {
+          deleteRoomSnapshot(previousCode);
+        }
         return;
       }
       case 'setSeat': {
@@ -291,6 +322,7 @@ export class GameHub {
         const room = this.requireRoom(client);
         this.rooms.addChat(room, client.playerId, msg.text);
         this.broadcast(room);
+        this.snapshotRoom(room);
         return;
       }
       case 'requestState': {
@@ -340,7 +372,11 @@ export class GameHub {
 
   private afterAction(room: Room): void {
     const finished = this.rooms.noteSettlement(room);
-    if (finished) this.persistRoom(room);
+    if (finished) {
+      this.persistRoom(room);
+    } else {
+      this.snapshotRoom(room);
+    }
     this.broadcast(room);
     this.scheduleAi(room);
   }
@@ -351,8 +387,20 @@ export class GameHub {
     try {
       saveMatchRecord(recordFromRoom(room, this.now()));
       this.persisted.add(matchId);
+      // 正式记录已落盘，删除进行中快照，避免重启后重复恢复
+      deleteRoomSnapshot(room.code);
     } catch {
-      // 落盘失败不阻断对局；下一次结算/查询仍可重试
+      // 落盘失败不阻断对局；保留房间快照，下一次结算/重启仍可重试
+    }
+  }
+
+  /** 保存进行中房间快照；失败不影响对局 */
+  private snapshotRoom(room: Room): void {
+    if (!this.persist || room.status !== 'playing' || !room.match) return;
+    try {
+      saveRoomSnapshot(room);
+    } catch {
+      // 快照失败不阻断对局；下一次动作会重试
     }
   }
 

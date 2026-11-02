@@ -1,15 +1,30 @@
 import type { BidCandidate } from './types';
 
+/**
+ * 可序列化随机源：除调用外，还能读取/恢复内部状态。
+ * 服务端房间快照需要保存 AI 随机状态，重启后才能无缝续跑。
+ */
+export interface Rng {
+  (): number;
+  getState(): number;
+  setState(state: number): void;
+}
+
 /** mulberry32：给定种子生成可复现的 [0,1) 随机源 */
-export function makeRng(seed: number): () => number {
+export function makeRng(seed: number): Rng {
   let a = seed >>> 0;
-  return () => {
+  const rng = (() => {
     a |= 0;
     a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }) as Rng;
+  rng.getState = () => a >>> 0;
+  rng.setState = (state: number) => {
+    a = state >>> 0;
   };
+  return rng;
 }
 
 export interface SelectOptions {

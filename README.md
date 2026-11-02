@@ -167,6 +167,10 @@ HTTP 接口见 [`contracts/http-api.md`](specs/001-online-pair-game/contracts/ht
 比赛 **完整打完** 后以 JSON 原子写入 `server/data/matches/<matchId>.json`
 （可用 `MATCH_DATA_DIR` 改目录；目录已被 `.gitignore` 忽略）。
 
+开赛后、未结束的房间会以原子写保存到 `server/data/rooms/<roomCode>.json`
+（可用 `ROOM_DATA_DIR` 改目录）。进程重启时会自动恢复这些房间：客户端用原身份重连即可
+回到牌桌；无人重连的座位在 `BOT_TAKEOVER_MS` 后由机器人接管，比赛继续完成。
+
 | 接口 | 说明 |
 |------|------|
 | `GET /api/health` | 健康检查：版本、协议版本、房间数、运行时长 |
@@ -185,6 +189,7 @@ HTTP 接口见 [`contracts/http-api.md`](specs/001-online-pair-game/contracts/ht
 | `AUTO_NEXT_MS` | `10000` | 一副结算后自动开下一副的等待时间 |
 | `BOT_TAKEOVER_MS` | `60000` | 开赛后断线托管宽限期；`0` 表示关闭 |
 | `MATCH_DATA_DIR` | `server/data/matches` | 比赛记录目录 |
+| `ROOM_DATA_DIR` | `server/data/rooms` | 进行中房间快照目录 |
 
 ### 部署
 
@@ -196,7 +201,8 @@ npm start            # 同端口托管 dist/、/api 与 /ws
 
 - 单进程即可运行；反向代理（Nginx/Caddy）需把 `/ws` 按 **WebSocket upgrade** 转发到同一端口，
   并为 SPA 路由（`/room/*`、`/matches/*`）回退到 `index.html`。
-- 服务端只使用文件系统保存已结束比赛，运行期房间状态在内存中；进程重启会丢失未结束房间。
+- 服务端使用文件系统保存已结束比赛与进行中房间快照；进程重启会恢复未结束房间，
+  客户端用原身份重连即可继续，无人重连的座位按 `BOT_TAKEOVER_MS` 托管。
 - 健康检查：`GET /api/health`。
 
 ## 规则引擎契约（冻结）
