@@ -4,11 +4,32 @@ import { FINAL_PASS_TEXT, useGameStore, describeCall, suitName } from '../store/
 import { auctionRows } from '../core/bidding/auctionGrid';
 import type { BidRecord, Position } from '../models/gameState';
 
-const props = withDefaults(defineProps<{ variant?: 'panel' | 'table' }>(), {
-  variant: 'panel',
-});
+/**
+ * 叫牌过程表。
+ *
+ * 默认读取单人 store；联网牌桌通过 `bidding-history` / `phase` /
+ * `current-bidder` 传入服务端快照，复用完全相同的叫牌纸样式与交互。
+ */
+const props = withDefaults(
+  defineProps<{
+    variant?: 'panel' | 'table';
+    biddingHistory?: BidRecord[] | null;
+    phase?: string | null;
+    currentBidder?: Position | null;
+  }>(),
+  {
+    variant: 'panel',
+    biddingHistory: null,
+    phase: null,
+    currentBidder: null,
+  },
+);
 
 const store = useGameStore();
+
+const history = computed(() => props.biddingHistory ?? store.biddingHistory);
+const phase = computed(() => props.phase ?? store.phase);
+const currentBidder = computed(() => props.currentBidder ?? store.currentBidder);
 const COLUMNS: Position[] = ['N', 'E', 'S', 'W'];
 /** 叫牌表头直接显示座位中文名（北 东 南 西） */
 const SEAT_LABEL: Record<Position, string> = { N: '北', E: '东', S: '南', W: '西' };
@@ -28,10 +49,10 @@ interface BidCell {
 
 /** 叫牌结束时的最后一个 Pass 用等号（上下双横杠）表示 */
 const finalPassIndex = computed(() => {
-  if (store.phase === 'bidding') return -1;
-  const last = store.biddingHistory.length - 1;
+  if (phase.value === 'bidding') return -1;
+  const last = history.value.length - 1;
   if (last < 0) return -1;
-  return store.biddingHistory[last]?.call.type === 'pass' ? last : -1;
+  return history.value[last]?.call.type === 'pass' ? last : -1;
 });
 
 /** 将叫品拆成“阶数 + 花色符号”，便于单独放大花色符号 */
@@ -63,21 +84,21 @@ function toBidCell(rec: BidRecord | null, final = false): BidCell | null {
 const bidRounds = computed<(BidCell | null)[][]>(() => {
   const rows: (BidCell | null)[][] = [];
   const rowIndices = auctionRows(
-    store.biddingHistory.map((rec) => rec.position),
+    history.value.map((rec) => rec.position),
     COLUMNS,
   );
-  store.biddingHistory.forEach((rec, i) => {
+  history.value.forEach((rec, i) => {
     const r = rowIndices[i] ?? 0;
     if (!rows[r]) rows[r] = [null, null, null, null];
     rows[r][COLUMNS.indexOf(rec.position)] = toBidCell(rec, i === finalPassIndex.value);
   });
 
   // 叫牌进行中：当前叫牌人的空档填问号，表示“正在考虑”
-  if (store.phase === 'bidding') {
-    const positions = [...store.biddingHistory.map((rec) => rec.position), store.currentBidder];
+  if (phase.value === 'bidding') {
+    const positions = [...history.value.map((rec) => rec.position), currentBidder.value];
     const nextRows = auctionRows(positions, COLUMNS);
     const row = nextRows[nextRows.length - 1] ?? 0;
-    const col = COLUMNS.indexOf(store.currentBidder);
+    const col = COLUMNS.indexOf(currentBidder.value);
     if (col >= 0) {
       if (!rows[row]) rows[row] = [null, null, null, null];
       if (!rows[row][col]) {
@@ -90,7 +111,7 @@ const bidRounds = computed<(BidCell | null)[][]>(() => {
 
 /** 白底提醒的悬停说明 */
 function cellTitle(cell: BidCell): string | undefined {
-  if (cell.thinking) return `${SEAT_LABEL[store.currentBidder]}家正在考虑叫牌`;
+  if (cell.thinking) return `${SEAT_LABEL[currentBidder.value]}家正在考虑叫牌`;
   if (cell.alerted) return cell.alertText ? `提醒：${cell.alertText}` : '提醒';
   return undefined;
 }

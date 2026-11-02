@@ -2,19 +2,55 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGameStore } from '../store/game';
 import { isCallLegal } from '../core/bidding/validator';
-import type { BidCall, BidSuit } from '../models/gameState';
+import type { BidCall, BidRecord, BidSuit, Position } from '../models/gameState';
 import { getSavedBiddingPopupPosition, saveBiddingPopupPosition } from './biddingPopupPosition';
 
+/**
+ * 叫牌卡浮窗。
+ *
+ * 默认驱动单人 store；联网牌桌传入服务端快照（bidding-history /
+ * current-bidder / can-bid），并通过 `submit` 事件提交，视觉与交互完全一致。
+ */
+const props = withDefaults(
+  defineProps<{
+    biddingHistory?: BidRecord[] | null;
+    currentBid?: { level: number; suit: BidSuit } | null;
+    currentBidder?: Position | null;
+    canBid?: boolean;
+    thinking?: boolean;
+    title?: string;
+  }>(),
+  {
+    biddingHistory: null,
+    currentBid: null,
+    currentBidder: null,
+    canBid: true,
+    thinking: false,
+    title: '',
+  },
+);
+
+const emit = defineEmits<{
+  (e: 'submit', call: BidCall, alert?: { text: string }): void;
+}>();
+
 const store = useGameStore();
+
+const external = computed(() => props.biddingHistory !== null);
+const biddingHistory = computed(() => props.biddingHistory ?? store.biddingHistory);
+const currentBid = computed(() => (external.value ? props.currentBid : store.currentBid));
+const currentBidder = computed(() => props.currentBidder ?? store.currentBidder);
+const thinking = computed(() => (external.value ? props.thinking : store.isAiThinking));
+const isHumanTurn = computed(() =>
+  external.value
+    ? props.canBid
+    : store.phase === 'bidding' && store.isHumanControlled(store.currentBidder),
+);
 
 const LEVELS = [1, 2, 3, 4, 5, 6, 7];
 const SUITS: BidSuit[] = ['C', 'D', 'H', 'S', 'NT'];
 const SUIT_SYMBOL: Record<BidSuit, string> = { C: '♣', D: '♦', H: '♥', S: '♠', NT: 'NT' };
 const RED_SUITS = new Set<BidSuit>(['D', 'H']);
-
-const isHumanTurn = computed(
-  () => store.phase === 'bidding' && store.isHumanControlled(store.currentBidder),
-);
 
 /** 叫牌卡当前选中的叫品；点击“确认”后才真正提交 */
 const selectedCall = ref<BidCall | null>(null);
@@ -23,7 +59,7 @@ const alertText = ref('');
 
 /** 回合或阶段变化后清空选择，避免把旧叫品带到下一手 */
 watch(
-  [() => store.currentBidder, () => store.phase, () => store.isAiThinking],
+  [currentBidder, () => props.canBid, () => props.thinking, () => biddingHistory.value.length],
   () => {
     selectedCall.value = null;
     alertText.value = '';
@@ -32,8 +68,8 @@ watch(
 
 /** 是否应禁用某按钮：AI 思考中 / 非人类回合 / 叫品不合法 */
 function isDisabled(call: BidCall): boolean {
-  if (store.isAiThinking || !isHumanTurn.value) return true;
-  return !isCallLegal(store.biddingHistory, store.currentBid, store.currentBidder, call);
+  if (thinking.value || !isHumanTurn.value) return true;
+  return !isCallLegal(biddingHistory.value, currentBid.value, currentBidder.value, call);
 }
 
 function sameCall(a: BidCall, b: BidCall): boolean {
@@ -50,11 +86,24 @@ function selectBid(level: number, suit: BidSuit): void {
   selectedCall.value = { type: 'bid', level, suit };
 }
 
-/** 双击叫牌卡：直接提交，无需再点确认 */
-function submitImmediately(call: BidCall): void {
+/** 提交叫品：外部模式交给父组件，单人模式直接写入 store */
+function commit(call: BidCall, withAlert = false): void {
   if (isDisabled(call)) return;
   selectedCall.value = null;
-  void store.humanBid(call);
+  if (external.value) {
+    emit('submit', call, withAlert ? { text: alertText.value.trim() } : undefined);
+  } else {
+    void store.humanBid(
+      call,
+      withAlert ? { alerted: true, alertText: alertText.value } : undefined,
+    );
+  }
+  alertText.value = '';
+}
+
+/** 双击叫牌卡：直接提交，无需再点确认 */
+function submitImmediately(call: BidCall): void {
+  commit(call, false);
 }
 
 function bidImmediately(level: number, suit: BidSuit): void {
@@ -78,10 +127,8 @@ const confirmDisabled = computed(() => {
 /** “确认+提醒”只把该次叫牌在叫牌表里标为白底，不再弹出提醒框 */
 function confirmBid(withAlert = false): void {
   const call = selectedCall.value;
-  if (!call || isDisabled(call)) return;
-
-  selectedCall.value = null;
-  void store.humanBid(call, withAlert ? { alerted: true, alertText: alertText.value } : undefined);
+  if (!call) return;
+  commit(call, withAlert);
 }
 
 /* ---------------------------------------------------------------- *
@@ -158,7 +205,7 @@ onBeforeUnmount(stopDrag);
     :style="{ left: `${position.x}px`, top: `${position.y}px` }"
   >
     <div class="popup-bar" :class="{ dragging }" @pointerdown="startDrag">
-      <strong>叫牌 · {{ store.currentBidder }}</strong>
+      <strong>叫牌 · {{ props.title || currentBidder }}</strong>
       <span>拖动移动</span>
     </div>
 

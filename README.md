@@ -108,7 +108,7 @@ src/
 ├── router.ts             # 路由：/、/room/:code、/solo、/matches
 ├── views/                # LobbyView / RoomView / SoloView / MatchesView
 ├── components/           # Table / Hand / BiddingBox / ScoreBoard / GameHistory / RuleEditor
-├── components/online/    # OnlineTable / BidPanel / SeatConfigPanel / ScoreTable / ...
+├── components/online/    # OnlineTable / OnlineSouthPlayed / SeatConfigPanel / ScoreTable / ...
 ├── testing/              # 测试辅助
 ├── App.vue               # 仅承载 <router-view />
 └── main.ts

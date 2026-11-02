@@ -149,3 +149,66 @@ describe('BiddingBox 叫牌浮窗', () => {
     expect(store.biddingHistory[4]?.call).toEqual({ type: 'redouble' });
   });
 });
+
+describe('BiddingBox 联网模式（外部快照）', () => {
+  function setupExternal(props: Record<string, unknown> = {}) {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = useGameStore();
+    store.startNewGame({ autoStart: false, seed: 11 });
+    const wrapper = mount(BiddingBox, {
+      props: {
+        biddingHistory: [],
+        currentBidder: 'S',
+        canBid: true,
+        ...props,
+      },
+      global: { plugins: [pinia, ElementPlus] },
+    });
+    return { store, wrapper };
+  }
+
+  it('外部模式下确认叫牌通过 submit 事件提交，不修改单人 store', async () => {
+    const { store, wrapper } = setupExternal();
+    const before = store.biddingHistory.length;
+
+    const oneSpade = wrapper.get('button.bid-btn[data-level="1"][data-suit="S"]');
+    await oneSpade.trigger('click');
+    await wrapper.get('.confirm-btn').trigger('click');
+
+    expect(store.biddingHistory).toHaveLength(before);
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{ type: 'bid', level: 1, suit: 'S' }, undefined]);
+  });
+
+  it('外部模式下“确认+提醒”把提醒文本一并提交', async () => {
+    const { wrapper } = setupExternal();
+    await wrapper.get('.bid-combo').setValue('约定叫');
+    await wrapper.get('button.bid-btn[data-level="1"][data-suit="S"]').trigger('click');
+    await wrapper.findAll('.confirm-btn')[1].trigger('click');
+
+    expect(wrapper.emitted('submit')?.[0]).toEqual([
+      { type: 'bid', level: 1, suit: 'S' },
+      { text: '约定叫' },
+    ]);
+  });
+
+  it('不允许操作时所有叫牌卡禁用', () => {
+    const { wrapper } = setupExternal({ canBid: false });
+    expect(wrapper.get('button.bid-btn[data-level="1"][data-suit="C"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.special-btn.pass').attributes('disabled')).toBeDefined();
+  });
+
+  it('外部模式下非法叫品仍按叫牌历史禁用', () => {
+    const { wrapper } = setupExternal({
+      biddingHistory: [{ position: 'N', call: { type: 'bid', level: 2, suit: 'H' } }],
+      currentBid: { level: 2, suit: 'H' },
+    });
+    expect(
+      wrapper.get('button.bid-btn[data-level="1"][data-suit="S"]').attributes('disabled'),
+    ).toBeDefined();
+    expect(
+      wrapper.get('button.bid-btn[data-level="2"][data-suit="S"]').attributes('disabled'),
+    ).toBeUndefined();
+  });
+});
+

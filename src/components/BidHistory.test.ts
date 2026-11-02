@@ -89,3 +89,51 @@ describe('BidHistory 叫牌结束符', () => {
     expect(wrapper.text()).not.toContain('加倍');
   });
 });
+
+describe('BidHistory 联网快照模式', () => {
+  it('使用外部叫牌历史与当前叫牌人渲染，不读取单人 store', () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = useGameStore();
+    store.startNewGame({ autoStart: false, seed: 10 });
+    store.biddingHistory = [{ position: 'N', call: { type: 'bid', level: 7, suit: 'NT' } }];
+
+    const wrapper = mount(BidHistory, {
+      props: {
+        variant: 'table',
+        biddingHistory: [
+          { position: 'N', call: { type: 'bid', level: 1, suit: 'H' }, alerted: true, alertText: '约定叫' },
+          { position: 'E', call: { type: 'pass' } },
+        ],
+        phase: 'bidding',
+        currentBidder: 'S',
+      },
+      global: { plugins: [pinia] },
+    });
+
+    expect(wrapper.get('.bid-header').text()).toContain('北');
+    expect(wrapper.text()).toContain('1♥');
+    expect(wrapper.text()).not.toContain('7NT');
+    expect(wrapper.get('.bid-cell.alerted').attributes('title')).toContain('约定叫');
+    expect(wrapper.get('.bid-cell.thinking .bid-label').text()).toBe('？');
+  });
+
+  it('外部阶段为打牌中时，最后一个 Pass 显示结束符', () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(BidHistory, {
+      props: {
+        biddingHistory: [
+          { position: 'N', call: { type: 'bid', level: 1, suit: 'H' } },
+          { position: 'E', call: { type: 'pass' } },
+          { position: 'S', call: { type: 'pass' } },
+          { position: 'W', call: { type: 'pass' } },
+        ],
+        phase: 'play',
+      },
+      global: { plugins: [pinia] },
+    });
+
+    expect(wrapper.text()).toContain('=');
+  });
+});
