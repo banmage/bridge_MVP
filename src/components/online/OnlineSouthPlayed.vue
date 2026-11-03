@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { ElDialog } from 'element-plus';
 import type { Position, Trick } from '../../models/gameState';
-import { getSide } from '../../models/gameState';
+import { getSide, ORDER } from '../../models/gameState';
 import { cardLabel } from '../../models/card';
 import type { RoomView } from '@shared/protocol';
 import PlayingCard from '../PlayingCard.vue';
@@ -11,11 +11,11 @@ import HandDiagram from '../HandDiagram.vue';
 
 /**
  * 联网牌桌右下角：与单机版 `SouthPlayed.vue` 相同的已出牌堆与常用按钮。
- * 已出牌是公开信息，因此固定展示南家的牌堆；摊牌只展示当前视角可见的牌。
+ * 以观看者座位为“本人”展示牌堆；摊牌只展示当前视角可见的牌。
  */
 
-const props = defineProps<{ room: RoomView; cardsVisible: boolean }>();
-const emit = defineEmits<{ (e: 'score'): void; (e: 'chat'): void }>();
+const props = defineProps<{ room: RoomView; cardsVisible: boolean; yourSeat: Position }>();
+const emit = defineEmits<{ (e: 'score'): void }>();
 
 const SEAT_LABEL: Record<Position, string> = { N: '北 N', E: '东 E', S: '南 S', W: '西 W' };
 const COLUMNS: Position[] = ['N', 'E', 'S', 'W'];
@@ -54,11 +54,17 @@ interface PileItem {
 
 const PILE_STEP = 13;
 
+/** 真实座位 → 相对出牌区方位（自己在下、同伴在上） */
+function trickSlotOf(pos: Position): 'N' | 'E' | 'S' | 'W' {
+  const relative = (ORDER.indexOf(pos) - ORDER.indexOf(props.yourSeat) + 4) % 4;
+  return (['S', 'W', 'N', 'E'] as const)[relative];
+}
+
 const pileItems = computed<PileItem[]>(() => {
   const items: PileItem[] = [];
   let x = 0;
   (board.value?.tricks ?? []).forEach((trick, index) => {
-    const play = trick.plays.find((p) => p.position === 'S');
+    const play = trick.plays.find((p) => p.position === props.yourSeat);
     if (!play) return;
     const won = getSide(trick.winner) === 'NS';
     const flat = !won;
@@ -71,7 +77,7 @@ const pileItems = computed<PileItem[]>(() => {
       left: x,
       width,
       trickNo: index + 1,
-      title: `第 ${index + 1} 墩 · 南家出 ${cardLabel(play.card)} · ${won ? '南北赢墩' : '东西赢墩'}`,
+      title: `第 ${index + 1} 墩 · 你出 ${cardLabel(play.card)} · ${won ? '己方赢墩' : '对方赢墩'}`,
     });
     x += PILE_STEP;
   });
@@ -142,7 +148,7 @@ const declarerTricksWon = computed(() => {
 </script>
 
 <template>
-  <div class="south-played" aria-label="南家已出牌与常用操作">
+  <div class="south-played" aria-label="本人已出牌与常用操作">
     <div
       v-if="cardsVisible"
       class="pile-wrap"
@@ -177,7 +183,7 @@ const declarerTricksWon = computed(() => {
               v-for="(play, index) in lastTrick.plays"
               :key="`${play.position}-${play.card}`"
               class="pop-card"
-              :class="[`slot-${play.position}`, { winner: lastTrick.winner === play.position }]"
+              :class="[`slot-${trickSlotOf(play.position)}`, { winner: lastTrick.winner === play.position }]"
               :style="{ zIndex: index + 1 }"
             >
               <span class="pop-card-inner" :style="{ animationDelay: `${index * 0.16}s` }">
@@ -195,7 +201,6 @@ const declarerTricksWon = computed(() => {
       <button type="button" class="action-btn" @click="emit('score')">计分表</button>
       <button type="button" class="action-btn" @click="exposeVisible = true">摊牌</button>
       <button type="button" class="action-btn" @click="contractVisible = true">定约卡</button>
-      <button type="button" class="action-btn" @click="emit('chat')">聊天</button>
     </div>
 
     <ElDialog v-model="exposeVisible" title="摊牌 · 已公开持牌" width="min(760px, 94vw)" append-to-body>

@@ -172,9 +172,17 @@ describe('Table 出牌显示', () => {
     store.hands.S = parseHand('SA H2');
     await nextTick();
 
-    const recommended = wrapper.find('.hand.pos-S .playing-card.recommended');
-    expect(recommended.exists()).toBe(true);
-    expect(recommended.attributes('title')).toBe('推荐出牌');
+    // 推荐不再改变牌面样式，而是在对应牌张上方显示闪烁箭头
+    expect(wrapper.find('.hand.pos-S .playing-card.recommended').exists()).toBe(false);
+    const arrow = wrapper.get('.hand.pos-S .play-hint-arrow');
+    expect(arrow.text()).toBe('▼');
+    expect(arrow.attributes('aria-label')).toBe('推荐出牌');
+
+    const slot = wrapper
+      .findAll('.hand.pos-S .card-slot')
+      .find((item) => item.find('.play-hint-arrow').exists());
+    expect(slot).toBeTruthy();
+    const recommended = slot!.get('.playing-card');
     // 西家首攻 ♠K，南家必须跟黑桃，推荐只能是 ♠A
     expect(recommended.attributes('data-suit')).toBe('♠');
     expect(recommended.attributes('data-rank')).toBe('A');
@@ -494,7 +502,11 @@ describe('Table 叫牌过程（座位与提醒）', () => {
 
     const cell = wrapper.findAll('.bid-cell')[0];
     expect(cell.classes()).toContain('alerted');
-    expect(cell.attributes('title')).toContain('约定叫');
+
+    await cell.trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('约定叫');
+    await cell.trigger('mouseleave');
+    expect(wrapper.find('.hint-veil').exists()).toBe(false);
   });
 });
 
@@ -673,8 +685,9 @@ describe('Table 当前出牌座位箭头', () => {
 
     store.nextPlayer = 'S';
     await nextTick();
-    expect(wrapper.findAll('.turn-arrow')).toHaveLength(1);
-    expect(wrapper.find('.hand.pos-S .turn-arrow').exists()).toBe(true);
+    // 轮到人类且存在推荐出牌时，用推荐箭头替代座位转向箭头，避免双箭头干扰
+    expect(wrapper.findAll('.turn-arrow')).toHaveLength(0);
+    expect(wrapper.find('.hand.pos-S .play-hint-arrow').exists()).toBe(true);
     expect(wrapper.find('.hand.pos-E .turn-arrow').exists()).toBe(false);
   });
 

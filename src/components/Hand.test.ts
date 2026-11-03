@@ -75,6 +75,41 @@ describe('Hand 牌面布局', () => {
     expect(wrapper.emitted('card-dblclick')?.[0]).toEqual([cards[0]]);
   });
 
+  it('推荐出牌在对应牌张上方显示闪烁箭头，悬停显示辅助说明', async () => {
+    const cards = parseHand('SA H2');
+    const wrapper = mount(Hand, {
+      props: { cards, position: 'S', clickable: true, recommendedCard: cards[0] },
+    });
+
+    expect(wrapper.find('.playing-card.recommended').exists()).toBe(false);
+    const slot = wrapper
+      .findAll('.card-slot')
+      .find((item) => item.find('.play-hint-arrow').exists());
+    expect(slot).toBeTruthy();
+    expect(slot!.get('.playing-card').attributes('data-rank')).toBe('A');
+    expect(slot!.get('.play-hint-arrow').text()).toBe('▼');
+
+    await slot!.trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('推荐出牌');
+    expect(wrapper.get('.hint-veil').text()).toContain('系统建议');
+    await slot!.trigger('mouseleave');
+    expect(wrapper.find('.hint-veil').exists()).toBe(false);
+  });
+
+  it('相对视角下转向箭头使用显示方位而不是真实座位', () => {
+    const wrapper = mount(Hand, {
+      props: {
+        cards: parseHand('SA H2'),
+        position: 'E',
+        displaySlot: 'south',
+        showTurnArrow: true,
+      },
+    });
+
+    expect(wrapper.get('.turn-arrow').classes()).toContain('pos-S');
+    expect(wrapper.get('.hand').classes()).toContain('pos-E');
+  });
+
   it('选中的牌带 selected 样式，右键派发 card-confirm 事件', async () => {
     const cards = parseHand('SAKQ HJT9 D5432 C87');
     const wrapper = mount(Hand, {

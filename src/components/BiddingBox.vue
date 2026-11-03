@@ -2,10 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGameStore } from '../store/game';
 import { callToString, isCallLegal } from '../core/bidding/validator';
-import { buildCallHints, callLabel, recommendCall, type BidRecommendation } from '../core/bidding/hints';
+import { buildCallHints, recommendCall, type BidRecommendation } from '../core/bidding/hints';
 import type { BiddingRule } from '../engine/types';
 import type { BidCall, BidRecord, BidSuit, Position, StyleLevel } from '../models/gameState';
 import { getSavedBiddingPopupPosition, saveBiddingPopupPosition } from './biddingPopupPosition';
+import HintVeil from './HintVeil.vue';
 
 /**
  * 叫牌卡浮窗。
@@ -64,6 +65,8 @@ const RED_SUITS = new Set<BidSuit>(['D', 'H']);
 const selectedCall = ref<BidCall | null>(null);
 /** “确认+提醒”可附带的提醒说明 */
 const alertText = ref('');
+/** 鼠标悬停时在统一浮动层显示的解释 */
+const hoverHint = ref<string | null>(null);
 
 /** 本桌规则资产：联网模式由父组件传入，单机模式使用 store 当前规则文件 */
 const rules = computed<BiddingRule[]>(() => props.biddingRules ?? store.biddingRules?.rules ?? []);
@@ -143,6 +146,14 @@ function isRecommended(call: BidCall): boolean {
 /** 叫牌卡悬停解释：优先使用规则库，缺失时给通用说明 */
 function hintFor(call: BidCall): string {
   return hints.value[callToString(call)] ?? '';
+}
+
+function hoverCall(call: BidCall): void {
+  hoverHint.value = hintFor(call) || null;
+}
+
+function clearHint(): void {
+  hoverHint.value = null;
 }
 
 function selectBid(level: number, suit: BidSuit): void {
@@ -273,17 +284,6 @@ onBeforeUnmount(stopDrag);
     </div>
 
     <div class="bidding-card">
-      <div
-        v-if="recommendation"
-        class="bid-recommend"
-        :title="recommendation.description"
-        data-testid="bid-recommendation"
-      >
-        <span class="bid-recommend-tag">推荐</span>
-        <strong class="bid-recommend-call">{{ callLabel(recommendation.call) }}</strong>
-        <span class="bid-recommend-desc">{{ recommendation.description }}</span>
-      </div>
-
       <div class="bid-grid">
         <div v-for="level in LEVELS" :key="level" class="level-row">
           <button
@@ -299,8 +299,11 @@ onBeforeUnmount(stopDrag);
             }"
             :data-level="level"
             :data-suit="suit"
-            :title="hintFor({ type: 'bid', level, suit })"
             :disabled="isDisabled({ type: 'bid', level, suit })"
+            @mouseenter="hoverCall({ type: 'bid', level, suit })"
+            @mouseleave="clearHint"
+            @focus="hoverCall({ type: 'bid', level, suit })"
+            @blur="clearHint"
             @click="selectBid(level, suit)"
             @dblclick="bidImmediately(level, suit)"
           >
@@ -336,8 +339,11 @@ onBeforeUnmount(stopDrag);
             selected: isSelected({ type: 'double' }),
             recommended: isRecommended({ type: 'double' }),
           }"
-          :title="hintFor({ type: 'double' })"
           :disabled="isDisabled({ type: 'double' })"
+          @mouseenter="hoverCall({ type: 'double' })"
+          @mouseleave="clearHint"
+          @focus="hoverCall({ type: 'double' })"
+          @blur="clearHint"
           @click="selectSimple('double')"
           @dblclick="specialImmediately('double')"
         >X</button>
@@ -348,8 +354,11 @@ onBeforeUnmount(stopDrag);
             selected: isSelected({ type: 'redouble' }),
             recommended: isRecommended({ type: 'redouble' }),
           }"
-          :title="hintFor({ type: 'redouble' })"
           :disabled="isDisabled({ type: 'redouble' })"
+          @mouseenter="hoverCall({ type: 'redouble' })"
+          @mouseleave="clearHint"
+          @focus="hoverCall({ type: 'redouble' })"
+          @blur="clearHint"
           @click="selectSimple('redouble')"
           @dblclick="specialImmediately('redouble')"
         >XX</button>
@@ -360,8 +369,11 @@ onBeforeUnmount(stopDrag);
             selected: isSelected({ type: 'pass' }),
             recommended: isRecommended({ type: 'pass' }),
           }"
-          :title="hintFor({ type: 'pass' })"
           :disabled="isDisabled({ type: 'pass' })"
+          @mouseenter="hoverCall({ type: 'pass' })"
+          @mouseleave="clearHint"
+          @focus="hoverCall({ type: 'pass' })"
+          @blur="clearHint"
           @click="selectSimple('pass')"
           @dblclick="specialImmediately('pass')"
         >Pass</button>
@@ -376,6 +388,8 @@ onBeforeUnmount(stopDrag);
         </button>
       </div>
     </div>
+
+    <HintVeil :text="hoverHint" />
   </div>
 </template>
 
@@ -383,8 +397,8 @@ onBeforeUnmount(stopDrag);
 .bidding-popup {
   position: fixed;
   z-index: 4000;
-  width: 260px;
-  padding: 0 6px 6px;
+  width: 300px;
+  padding: 0 7px 7px;
   border: 1px solid #5f6c63;
   border-radius: 6px;
   background: #ededed;
@@ -423,42 +437,8 @@ onBeforeUnmount(stopDrag);
 /* —— 叫牌卡：按 image/叫牌卡.png 的紧凑样式 —— */
 .bidding-card {
   width: 100%;
-  padding: 4px 0 0;
+  padding: 3px 0 0;
   color: #000;
-}
-/* 自动推荐：显示推荐叫品与规则说明（不自动提交） */
-.bid-recommend {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  margin: 0 0 4px;
-  padding: 2px 4px;
-  border: 1px solid #c9a227;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #fffbe0, #fff2a8);
-  font-size: 10px;
-  line-height: 1.3;
-}
-.bid-recommend-tag {
-  flex: none;
-  padding: 0 3px;
-  border-radius: 2px;
-  background: #b8860b;
-  color: #fffbe0;
-  font-weight: 700;
-}
-.bid-recommend-call {
-  flex: none;
-  color: #8a5a00;
-  font-size: 12px;
-}
-.bid-recommend-desc {
-  min-width: 0;
-  overflow: hidden;
-  color: #6a5320;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .bid-grid {
   display: flex;
@@ -474,10 +454,10 @@ onBeforeUnmount(stopDrag);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  height: 20px;
+  gap: 2px;
+  height: 25px;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 3px;
   border: 1px solid #858585;
   border-radius: 0;
   background: #ffff99;
@@ -486,7 +466,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -494,16 +474,16 @@ onBeforeUnmount(stopDrag);
 .bid-btn:hover:not(:disabled) {
   background: #ffffc4;
 }
-.bid-btn.selected {
-  background: #fff36b;
+/* 推荐：绿色框；用户选中：浅红色框。两者同时存在时以选中为准 */
+.bid-btn.recommended:not(:disabled) {
   box-shadow:
-    inset 0 0 0 2px #111,
+    inset 0 0 0 2px #2f9e4f,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
-.bid-btn.recommended:not(.selected):not(:disabled) {
-  background: #fff9bf;
+.bid-btn.selected:not(:disabled) {
+  background: #ffe0e0;
   box-shadow:
-    inset 0 0 0 2px #d4a017,
+    inset 0 0 0 2px #e27676,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
 .bid-btn:disabled {
@@ -514,11 +494,11 @@ onBeforeUnmount(stopDrag);
   cursor: not-allowed;
 }
 .bid-level {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
 }
 .bid-suit {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 800;
   line-height: 1;
 }
@@ -526,7 +506,7 @@ onBeforeUnmount(stopDrag);
   color: #d00000;
 }
 .bid-suit.nt {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: -0.4px;
 }
 .bid-btn:disabled .bid-level,
@@ -535,9 +515,9 @@ onBeforeUnmount(stopDrag);
 }
 .bid-combo {
   width: 100%;
-  height: 20px;
+  height: 24px;
   margin: 3px 0 2px;
-  padding: 0 2px;
+  padding: 0 3px;
   border: 1px solid #7e7e7e;
   border-radius: 0;
   background: #fff;
@@ -555,7 +535,7 @@ onBeforeUnmount(stopDrag);
   gap: 2px;
 }
 .special-btn {
-  height: 20px;
+  height: 25px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -566,7 +546,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -580,16 +560,15 @@ onBeforeUnmount(stopDrag);
 .special-btn:hover:not(:disabled) {
   background: #ffffc4;
 }
-.special-btn.selected {
-  background: #fff36b;
+.special-btn.recommended:not(:disabled) {
   box-shadow:
-    inset 0 0 0 2px #111,
+    inset 0 0 0 2px #2f9e4f,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
-.special-btn.recommended:not(.selected):not(:disabled) {
-  background: #fff9bf;
+.special-btn.selected:not(:disabled) {
+  background: #ffe0e0;
   box-shadow:
-    inset 0 0 0 2px #d4a017,
+    inset 0 0 0 2px #e27676,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
 .special-btn:disabled {
@@ -606,7 +585,7 @@ onBeforeUnmount(stopDrag);
   margin-top: 2px;
 }
 .confirm-btn {
-  height: 20px;
+  height: 25px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -617,7 +596,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;

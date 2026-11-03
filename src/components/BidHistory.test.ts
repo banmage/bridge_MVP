@@ -91,7 +91,7 @@ describe('BidHistory 叫牌结束符', () => {
 });
 
 describe('BidHistory 联网快照模式', () => {
-  it('使用外部叫牌历史与当前叫牌人渲染，不读取单人 store', () => {
+  it('使用外部叫牌历史与当前叫牌人渲染，不读取单人 store', async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useGameStore();
@@ -114,8 +114,15 @@ describe('BidHistory 联网快照模式', () => {
     expect(wrapper.get('.bid-header').text()).toContain('北');
     expect(wrapper.text()).toContain('1♥');
     expect(wrapper.text()).not.toContain('7NT');
-    expect(wrapper.get('.bid-cell.alerted').attributes('title')).toContain('约定叫');
-    expect(wrapper.get('.bid-cell.alerted').attributes('title')).toContain('1H 开叫');
+
+    const alerted = wrapper.get('.bid-cell.alerted');
+    await alerted.trigger('mouseenter');
+    const hint = wrapper.get('.hint-veil').text();
+    expect(hint).toContain('约定叫');
+    expect(hint).toContain('1H 开叫');
+
+    await alerted.trigger('mouseleave');
+    expect(wrapper.find('.hint-veil').exists()).toBe(false);
     expect(wrapper.get('.bid-cell.thinking .bid-label').text()).toBe('？');
   });
 

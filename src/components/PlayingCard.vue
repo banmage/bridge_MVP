@@ -15,8 +15,6 @@ const props = withDefaults(
     active?: boolean;
     /** 左键选中：牌面微微上移 */
     selected?: boolean;
-    /** 系统推荐出牌：显示金色箭头与高亮 */
-    recommended?: boolean;
     /**
      * 文本标签：
      * - rank：只输出点数（手牌，兼容既有“按点数排序”的测试/布局）
@@ -31,7 +29,6 @@ const props = withDefaults(
     clickable: false,
     active: false,
     selected: false,
-    recommended: false,
     labelMode: 'rank',
   },
 );
@@ -75,15 +72,13 @@ const ace = computed(() => {
     :class="[
       `size-${size}`,
       red ? 'red' : 'black',
-      { clickable, active, selected, recommended, court, ace, 'suit-first': labelMode === 'suit-first' },
+      { clickable, active, selected, court, ace, 'suit-first': labelMode === 'suit-first' },
     ]"
     :data-suit="suit"
     :data-rank="rank"
-    :title="recommended ? '推荐出牌' : undefined"
     :disabled="!clickable"
     @click="emit('click')"
   >
-    <span v-if="recommended" class="pc-recommend-arrow" aria-hidden="true">▼</span>
     <span class="pc-label">
       <template v-if="labelMode === 'suit-first'">
         <span class="suit-symbol">{{ suit }}</span><span>{{ rank }}</span>
@@ -538,40 +533,6 @@ const ace = computed(() => {
 .playing-card.active {
   outline: 2px solid #ffd666;
   outline-offset: 1px;
-}
-/* 出牌推荐：抬高层级，避免被相邻叠牌盖住；顶部金色下箭头指向该牌 */
-.playing-card.recommended {
-  z-index: 8;
-  outline: 2px solid #ffb020;
-  outline-offset: 1px;
-  box-shadow:
-    0 0 0 2px rgba(255, 176, 32, 0.34),
-    0 8px 16px rgba(0, 0, 0, 0.34);
-}
-.playing-card.recommended .pc-recommend-arrow {
-  position: absolute;
-  top: 1px;
-  left: 50%;
-  z-index: 5;
-  color: #ff9800;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
-  text-shadow:
-    0 1px 0 #fff,
-    0 0 5px rgba(255, 152, 0, 0.9);
-  transform: translateX(-50%);
-  animation: pc-recommend-bounce 0.9s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes pc-recommend-bounce {
-  0%,
-  100% {
-    transform: translate(-50%, 0);
-  }
-  50% {
-    transform: translate(-50%, 3px);
-  }
 }
 .playing-card:disabled {
   cursor: default;

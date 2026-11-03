@@ -30,13 +30,4 @@ describe('PlayingCard 双角标', () => {
     expect(wrapper.classes()).toContain('red');
   });
 
-  it('推荐出牌显示金色箭头与可访问提示', () => {
-    const wrapper = mount(PlayingCard, {
-      props: { card: parseHand('SA')[0], size: 'xxl', recommended: true, clickable: true },
-    });
-
-    expect(wrapper.classes()).toContain('recommended');
-    expect(wrapper.get('.pc-recommend-arrow').text()).toBe('▼');
-    expect(wrapper.attributes('title')).toBe('推荐出牌');
-  });
 });

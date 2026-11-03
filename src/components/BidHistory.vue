@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { FINAL_PASS_TEXT, useGameStore, describeCall, suitName } from '../store/game';
 import { auctionRows } from '../core/bidding/auctionGrid';
 import { explainBidRecord } from '../core/bidding/hints';
 import type { BiddingRule } from '../engine/types';
 import type { BidRecord, Position } from '../models/gameState';
+import HintVeil from './HintVeil.vue';
 
 /**
  * 叫牌过程表。
@@ -124,13 +125,23 @@ const bidRounds = computed<(BidCell | null)[][]>(() => {
   return rows;
 });
 
-/** 白底提醒的悬停说明 */
-function cellTitle(cell: BidCell): string | undefined {
+/** 悬停解释：提醒与规则含义合并到统一的浮动层显示 */
+function cellHint(cell: BidCell): string | undefined {
   if (cell.thinking) return `${SEAT_LABEL[currentBidder.value]}家正在考虑叫牌`;
   const parts: string[] = [];
   if (cell.alerted) parts.push(cell.alertText ? `提醒：${cell.alertText}` : '提醒');
   if (cell.explanation) parts.push(cell.explanation);
   return parts.length ? parts.join('\n') : undefined;
+}
+
+const hoverText = ref<string | null>(null);
+
+function hoverCell(cell: BidCell | null): void {
+  hoverText.value = cell ? cellHint(cell) ?? null : null;
+}
+
+function clearCellHint(): void {
+  hoverText.value = null;
 }
 </script>
 
@@ -146,7 +157,8 @@ function cellTitle(cell: BidCell): string | undefined {
           :key="j"
           class="bid-cell"
           :class="{ alerted: cell?.alerted, thinking: cell?.thinking }"
-          :title="cell ? cellTitle(cell) : undefined"
+          @mouseenter="hoverCell(cell)"
+          @mouseleave="clearCellHint"
         >
           <template v-if="cell">
             <template v-if="cell.suit">
@@ -167,6 +179,8 @@ function cellTitle(cell: BidCell): string | undefined {
       </div>
       <div v-if="bidRounds.length === 0" class="muted">尚未开始叫牌</div>
     </div>
+
+    <HintVeil :text="hoverText" />
   </div>
 </template>
 

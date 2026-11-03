@@ -54,47 +54,62 @@ body {
   width: 100%;
   max-width: none;
   margin: 0 auto;
-  padding: 14px;
+  padding: 8px;
 }
 
+/* 顶栏固定为紧凑的一行；窗口过窄时横向滚动，不再换行挤占牌桌高度 */
 .app-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 7px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   color: #eaf5ee;
-  margin-bottom: 14px;
-  padding: 9px 12px;
-  border-radius: 12px;
+  margin-bottom: 6px;
+  padding: 4px 9px;
+  border-radius: 9px;
   background: linear-gradient(180deg, rgba(6, 32, 21, 0.62), rgba(4, 24, 16, 0.38));
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(7px);
+  scrollbar-width: none;
+}
+.app-header::-webkit-scrollbar {
+  display: none;
 }
 
 .app-header h1 {
-  font-size: 19px;
+  font-size: 15px;
   margin: 0;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
 .app-header .status {
   flex: 1;
-  min-width: 220px;
-  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 6px 11px;
+  border-radius: 7px;
+  padding: 3px 8px;
   color: rgba(234, 245, 238, 0.9);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .app-header .status strong {
   color: #ffe19a;
 }
 
 .app-header .el-button {
+  flex: none;
+  height: 25px;
+  margin-left: 0;
+  padding: 0 9px;
   border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -105,14 +120,10 @@ body {
 
 @media (max-width: 780px) {
   #app {
-    padding: 9px;
+    padding: 6px;
   }
   .app-header h1 {
-    font-size: 16px;
-  }
-  .app-header .status {
-    order: 5;
-    flex-basis: 100%;
+    font-size: 14px;
   }
 }
 

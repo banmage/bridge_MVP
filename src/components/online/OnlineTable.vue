@@ -4,7 +4,7 @@ import type { CardPlay, Position } from '../../models/gameState';
 import type { RoomView } from '@shared/protocol';
 import type { BiddingRule, LeadRule } from '../../engine/types';
 import { loadLeadRules } from '../../engine/loader';
-import { describeCall, describeContract, vulName } from '@shared/format';
+import { describeContract, vulName } from '@shared/format';
 import { getSuit } from '../../models/card';
 import { isCardLegal } from '../../core/playing';
 import { declarerTricksOf, recommendPlay } from '../../ai/playHint';
@@ -14,6 +14,7 @@ import BidHistory from '../BidHistory.vue';
 import ContractDisplay from '../ContractDisplay.vue';
 import PlayingCard from '../PlayingCard.vue';
 import OnlineSouthPlayed from './OnlineSouthPlayed.vue';
+import OnlineChat from './OnlineChat.vue';
 
 /**
  * 联网牌桌。
@@ -33,7 +34,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'play', card: number): void;
   (e: 'score'): void;
-  (e: 'chat'): void;
+  (e: 'chat-send', text: string): void;
 }>();
 
 /** 首攻规则只解析一次，供出牌推荐复用 */
@@ -52,6 +53,45 @@ const VUL_TEXT: Record<string, string> = {
 };
 
 const board = computed(() => props.room.board);
+
+type DisplaySlot = 'north' | 'south' | 'west' | 'east';
+const SEAT_ORDER: Position[] = ['N', 'E', 'S', 'W'];
+
+/** 观看者座位：自己的牌始终在正下方，同伴始终在正上方 */
+const viewerSeat = computed<Position>(
+  () => board.value?.yourSeat ?? props.room.you.seat ?? props.room.you.reclaimableSeat ?? 'S',
+);
+
+/**
+ * 相对方位映射：顺时针 N→E→S→W。
+ * 自己在下、同伴在上；左手边是顺时针下一家，右手边是顺时针上一家。
+ */
+const displaySeats = computed<Record<DisplaySlot, Position>>(() => {
+  const me = SEAT_ORDER.indexOf(viewerSeat.value);
+  return {
+    south: SEAT_ORDER[me],
+    west: SEAT_ORDER[(me + 1) % 4],
+    north: SEAT_ORDER[(me + 2) % 4],
+    east: SEAT_ORDER[(me + 3) % 4],
+  };
+});
+
+const northSeat = computed(() => displaySeats.value.north);
+const eastSeat = computed(() => displaySeats.value.east);
+const southSeat = computed(() => displaySeats.value.south);
+const westSeat = computed(() => displaySeats.value.west);
+
+/** 真实座位 → 相对方位（用于出牌区、箭头与手牌布局） */
+function slotOf(pos: Position): DisplaySlot {
+  const entries = Object.entries(displaySeats.value) as [DisplaySlot, Position][];
+  return entries.find(([, seat]) => seat === pos)?.[0] ?? 'south';
+}
+
+/** 出牌区沿用既有 CSS 方位类，但按观看者视角旋转 */
+function trickSlotOf(pos: Position): 'N' | 'E' | 'S' | 'W' {
+  return ({ north: 'N', east: 'E', south: 'S', west: 'W' } as const)[slotOf(pos)];
+}
+
 const isBidding = computed(() => board.value?.phase === 'bidding');
 const isPlaying = computed(
   () => board.value?.phase === 'play' || board.value?.phase === 'play_waiting_lead',
@@ -312,48 +352,41 @@ const recommendedCard = computed<number | null>(() => {
   }, leadRulesForHints());
 });
 
-/** 最近一条带约定提醒的叫牌，用于在牌桌上直接解释含义 */
-const latestAlert = computed(() => {
-  const bidding = board.value?.bidding ?? [];
-  for (let i = bidding.length - 1; i >= 0; i -= 1) {
-    const record = bidding[i];
-    if (!record.alerted) continue;
-    return {
-      position: record.position,
-      call: describeCall(record.call),
-      text: record.alertText?.trim() || '约定叫',
-    };
-  }
-  return null;
-});
-
 const contractText = computed(() => describeContract(board.value?.contract ?? null));
 </script>
 
 <template>
   <div class="table online-table">
-    <!-- 北家 -->
-    <div class="seat north" :class="{ active: isActive('N') }">
+    <!-- 正上方：同伴（相对视角） -->
+    <div class="seat north" :class="{ active: isActive(northSeat) }">
       <div class="seat-profile">
-        <span class="seat-name">{{ seatLabel('N') }}</span>
-        <span v-if="occupantTag('N')" class="seat-tag">{{ occupantTag('N') }}</span>
-        <span v-if="isDummySeat('N')" class="dummy-tag">明手</span>
+        <span class="seat-name">{{ seatLabel(northSeat) }}</span>
+        <span v-if="occupantTag(northSeat)" class="seat-tag">{{ occupantTag(northSeat) }}</span>
+        <span v-if="isDummySeat(northSeat)" class="dummy-tag">明手</span>
       </div>
       <Hand
-        v-if="visibleCards('N')"
-        :cards="visibleCards('N')!"
-        position="N"
-        :is-dummy="isDummySeat('N')"
-        :clickable="isClickable('N')"
-        :active="isActive('N')"
-        :show-turn-arrow="showTurnArrow('N')"
+        v-if="visibleCards(northSeat)"
+        :cards="visibleCards(northSeat)!"
+        :position="northSeat"
+        display-slot="north"
+        :is-dummy="isDummySeat(northSeat)"
+        :clickable="isClickable(northSeat)"
+        :active="isActive(northSeat)"
+        :show-turn-arrow="showTurnArrow(northSeat)"
         :selected-card="selectedCard"
         :recommended-card="recommendedCard"
-        @card-click="(c) => onCardClick('N', c)"
-        @card-confirm="(c) => onCardConfirm('N', c)"
-        @card-dblclick="(c) => onCardDoubleClick('N', c)"
+        @card-click="(c) => onCardClick(northSeat, c)"
+        @card-confirm="(c) => onCardConfirm(northSeat, c)"
+        @card-dblclick="(c) => onCardDoubleClick(northSeat, c)"
       />
-      <Hand v-else :cards="faceDownCards('N')" position="N" face-down :show-turn-arrow="showTurnArrow('N')" />
+      <Hand
+        v-else
+        :cards="faceDownCards(northSeat)"
+        :position="northSeat"
+        display-slot="north"
+        face-down
+        :show-turn-arrow="showTurnArrow(northSeat)"
+      />
     </div>
 
     <!-- 左上角牌局信息：副序、局况、定约、赢墩数 -->
@@ -389,34 +422,38 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :current-bidder="board?.currentBidder ?? null"
         :bidding-rules="biddingRules ?? null"
       />
-      <div v-if="latestAlert" class="bid-alert-note" :title="latestAlert.text">
-        <span class="alert-tag">提醒</span>
-        <span>{{ latestAlert.position }} {{ latestAlert.call }}：{{ latestAlert.text }}</span>
-      </div>
     </aside>
 
-    <!-- 西家 -->
-    <div class="seat west" :class="{ active: isActive('W') }">
+    <!-- 左手方（相对视角） -->
+    <div class="seat west" :class="{ active: isActive(westSeat) }">
       <div class="seat-profile">
-        <span class="seat-name">{{ seatLabel('W') }}</span>
-        <span v-if="occupantTag('W')" class="seat-tag">{{ occupantTag('W') }}</span>
-        <span v-if="isDummySeat('W')" class="dummy-tag">明手</span>
+        <span class="seat-name">{{ seatLabel(westSeat) }}</span>
+        <span v-if="occupantTag(westSeat)" class="seat-tag">{{ occupantTag(westSeat) }}</span>
+        <span v-if="isDummySeat(westSeat)" class="dummy-tag">明手</span>
       </div>
       <Hand
-        v-if="visibleCards('W')"
-        :cards="visibleCards('W')!"
-        position="W"
-        :is-dummy="isDummySeat('W')"
-        :clickable="isClickable('W')"
-        :active="isActive('W')"
-        :show-turn-arrow="showTurnArrow('W')"
+        v-if="visibleCards(westSeat)"
+        :cards="visibleCards(westSeat)!"
+        :position="westSeat"
+        display-slot="west"
+        :is-dummy="isDummySeat(westSeat)"
+        :clickable="isClickable(westSeat)"
+        :active="isActive(westSeat)"
+        :show-turn-arrow="showTurnArrow(westSeat)"
         :selected-card="selectedCard"
         :recommended-card="recommendedCard"
-        @card-click="(c) => onCardClick('W', c)"
-        @card-confirm="(c) => onCardConfirm('W', c)"
-        @card-dblclick="(c) => onCardDoubleClick('W', c)"
+        @card-click="(c) => onCardClick(westSeat, c)"
+        @card-confirm="(c) => onCardConfirm(westSeat, c)"
+        @card-dblclick="(c) => onCardDoubleClick(westSeat, c)"
       />
-      <Hand v-else :cards="faceDownCards('W')" position="W" face-down :show-turn-arrow="showTurnArrow('W')" />
+      <Hand
+        v-else
+        :cards="faceDownCards(westSeat)"
+        :position="westSeat"
+        display-slot="west"
+        face-down
+        :show-turn-arrow="showTurnArrow(westSeat)"
+      />
     </div>
 
     <!-- 中央：叫牌时显示叫牌过程，打牌时按出牌次序叠放本墩牌面 -->
@@ -437,7 +474,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
             v-for="(play, index) in boardTrick.plays"
             :key="`${play.position}-${play.card}`"
             class="trick-play"
-            :class="[`slot-${play.position}`, { winner: boardTrick.winner === play.position }]"
+            :class="[`slot-${trickSlotOf(play.position)}`, { winner: boardTrick.winner === play.position }]"
             :style="{ zIndex: index + 1 }"
           >
             <PlayingCard :card="play.card" size="xxl" label-mode="suit-first" />
@@ -445,84 +482,98 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
           </div>
         </div>
       </div>
-
-      <div v-if="isBidding && latestAlert" class="bid-alert-note center-alert" :title="latestAlert.text">
-        <span class="alert-tag">提醒</span>
-        <span>{{ latestAlert.position }} {{ latestAlert.call }}：{{ latestAlert.text }}</span>
-      </div>
     </div>
 
-    <!-- 南家已出牌（右下角）+ 计分表 / 摊牌 / 定约卡 / 聊天 -->
+    <!-- 本人已出牌（右下角）+ 计分表 / 摊牌 / 定约卡 -->
     <OnlineSouthPlayed
       :room="room"
       :cards-visible="cardsVisible"
+      :your-seat="southSeat"
       @score="emit('score')"
-      @chat="emit('chat')"
     />
 
-    <!-- 东家 -->
-    <div class="seat east" :class="{ active: isActive('E') }">
+    <!-- 右手方（相对视角） -->
+    <div class="seat east" :class="{ active: isActive(eastSeat) }">
       <div class="seat-profile">
-        <span class="seat-name">{{ seatLabel('E') }}</span>
-        <span v-if="occupantTag('E')" class="seat-tag">{{ occupantTag('E') }}</span>
-        <span v-if="isDummySeat('E')" class="dummy-tag">明手</span>
+        <span class="seat-name">{{ seatLabel(eastSeat) }}</span>
+        <span v-if="occupantTag(eastSeat)" class="seat-tag">{{ occupantTag(eastSeat) }}</span>
+        <span v-if="isDummySeat(eastSeat)" class="dummy-tag">明手</span>
       </div>
       <Hand
-        v-if="visibleCards('E')"
-        :cards="visibleCards('E')!"
-        position="E"
-        :is-dummy="isDummySeat('E')"
-        :clickable="isClickable('E')"
-        :active="isActive('E')"
-        :show-turn-arrow="showTurnArrow('E')"
+        v-if="visibleCards(eastSeat)"
+        :cards="visibleCards(eastSeat)!"
+        :position="eastSeat"
+        display-slot="east"
+        :is-dummy="isDummySeat(eastSeat)"
+        :clickable="isClickable(eastSeat)"
+        :active="isActive(eastSeat)"
+        :show-turn-arrow="showTurnArrow(eastSeat)"
         :selected-card="selectedCard"
         :recommended-card="recommendedCard"
-        @card-click="(c) => onCardClick('E', c)"
-        @card-confirm="(c) => onCardConfirm('E', c)"
-        @card-dblclick="(c) => onCardDoubleClick('E', c)"
+        @card-click="(c) => onCardClick(eastSeat, c)"
+        @card-confirm="(c) => onCardConfirm(eastSeat, c)"
+        @card-dblclick="(c) => onCardDoubleClick(eastSeat, c)"
       />
-      <Hand v-else :cards="faceDownCards('E')" position="E" face-down :show-turn-arrow="showTurnArrow('E')" />
+      <Hand
+        v-else
+        :cards="faceDownCards(eastSeat)"
+        :position="eastSeat"
+        display-slot="east"
+        face-down
+        :show-turn-arrow="showTurnArrow(eastSeat)"
+      />
     </div>
 
-    <!-- 南家 -->
-    <div class="seat south" :class="{ active: isActive('S') }">
+    <!-- 正下方：本人（相对视角） -->
+    <div class="seat south" :class="{ active: isActive(southSeat) }">
       <Hand
-        v-if="visibleCards('S')"
-        :cards="visibleCards('S')!"
-        position="S"
-        :is-dummy="isDummySeat('S')"
-        :clickable="isClickable('S')"
-        :active="isActive('S')"
-        :show-turn-arrow="showTurnArrow('S')"
+        v-if="visibleCards(southSeat)"
+        :cards="visibleCards(southSeat)!"
+        :position="southSeat"
+        display-slot="south"
+        :is-dummy="isDummySeat(southSeat)"
+        :clickable="isClickable(southSeat)"
+        :active="isActive(southSeat)"
+        :show-turn-arrow="showTurnArrow(southSeat)"
         :selected-card="selectedCard"
         :recommended-card="recommendedCard"
-        @card-click="(c) => onCardClick('S', c)"
-        @card-confirm="(c) => onCardConfirm('S', c)"
-        @card-dblclick="(c) => onCardDoubleClick('S', c)"
+        @card-click="(c) => onCardClick(southSeat, c)"
+        @card-confirm="(c) => onCardConfirm(southSeat, c)"
+        @card-dblclick="(c) => onCardDoubleClick(southSeat, c)"
       />
-      <Hand v-else :cards="faceDownCards('S')" position="S" face-down :show-turn-arrow="showTurnArrow('S')" />
+      <Hand
+        v-else
+        :cards="faceDownCards(southSeat)"
+        :position="southSeat"
+        display-slot="south"
+        face-down
+        :show-turn-arrow="showTurnArrow(southSeat)"
+      />
       <div class="seat-profile">
-        <span class="seat-name">{{ seatLabel('S') }}</span>
-        <span v-if="occupantTag('S')" class="seat-tag">{{ occupantTag('S') }}</span>
-        <span v-if="isDummySeat('S')" class="dummy-tag">明手</span>
+        <span class="seat-name">{{ seatLabel(southSeat) }}</span>
+        <span v-if="occupantTag(southSeat)" class="seat-tag">{{ occupantTag(southSeat) }}</span>
+        <span v-if="isDummySeat(southSeat)" class="dummy-tag">明手</span>
       </div>
     </div>
+
+    <!-- 左下方：常驻聊天，可滚动 -->
+    <OnlineChat :messages="room.chat" @send="emit('chat-send', $event)" />
   </div>
 </template>
 
 <style scoped>
 .table {
-  --table-pad: 14px;
+  --table-pad: 8px;
   position: relative;
   display: grid;
   grid-template-areas:
     'north north north'
     'west center east'
     'south south south';
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 360px) minmax(0, 1fr);
-  grid-template-rows: auto minmax(280px, 1fr) auto;
-  gap: 8px 12px;
-  min-height: clamp(620px, calc(100vh - 140px), 920px);
+  grid-template-columns: minmax(0, 1fr) clamp(310px, 24vw, 370px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(250px, 1fr) auto;
+  gap: 4px 8px;
+  min-height: calc(100vh - 92px);
   overflow: hidden;
   background:
     radial-gradient(ellipse at 50% 42%, rgba(72, 167, 112, 0.36), transparent 58%),
@@ -627,17 +678,17 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   flex-direction: column;
   gap: 4px;
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   min-height: 0;
 }
 /* 左右两块信息与北家手牌上沿平齐：左侧牌局信息，右侧叫牌过程 */
 .play-info-panel,
 .play-bid-history {
   position: absolute;
-  top: calc(var(--table-pad) + 18px);
+  top: calc(var(--table-pad) + 14px);
   z-index: 2;
   box-sizing: border-box;
-  width: clamp(200px, 22%, 300px);
+  width: clamp(188px, 20%, 286px);
 }
 .play-info-panel {
   left: var(--table-pad);
@@ -749,33 +800,6 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
 .center-bid-history :deep(.bid-label) {
   font-size: 13px;
 }
-/* 最近一次约定叫的解释：牌桌中央 / 右侧叫牌过程各显示一份 */
-.bid-alert-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 5px;
-  padding: 4px 7px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #33270a;
-  font-size: 11px;
-  line-height: 1.45;
-  text-align: left;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-.center-alert {
-  margin-top: 2px;
-}
-.alert-tag {
-  flex: none;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: #ffe19a;
-  color: #2c2200;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.5;
-}
 .trick-board {
   flex: 1;
   display: flex;
@@ -851,12 +875,12 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
 }
 @media (max-width: 900px) {
   .table {
-    --table-pad: 10px;
+    --table-pad: 8px;
     grid-template-columns: minmax(0, 1fr) 320px minmax(0, 1fr);
-    grid-template-rows: auto minmax(280px, 1fr) auto;
-    min-height: 600px;
+    grid-template-rows: auto minmax(250px, 1fr) auto;
+    min-height: 560px;
     padding: var(--table-pad);
-    gap: 6px;
+    gap: 4px;
   }
   .trick-board {
     min-height: 252px;

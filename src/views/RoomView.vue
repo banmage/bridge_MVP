@@ -17,9 +17,7 @@ const router = useRouter();
 
 const replayVisible = ref(false);
 const replayIndex = ref<number | null>(null);
-const chatVisible = ref(false);
 const scoreVisible = ref(false);
-const chatText = ref('');
 const now = ref(Date.now());
 
 /** 联网牌桌的规则提示统一使用默认精确体系（服务端默认体系） */
@@ -187,10 +185,8 @@ function copyCode(): void {
   void navigator.clipboard?.writeText(`${location.origin}/room/${code}`).catch(() => undefined);
 }
 
-function sendChat(): void {
-  if (!chatText.value.trim()) return;
-  store.chat(chatText.value);
-  chatText.value = '';
+function onChatSend(text: string): void {
+  store.chat(text);
 }
 </script>
 
@@ -200,15 +196,26 @@ function sendChat(): void {
       <router-link to="/" class="back">← 大厅</router-link>
       <h1>房间 <span class="code">{{ props.code.toUpperCase() }}</span></h1>
       <div class="status">
-        <strong>{{ phaseLabel }}</strong> · {{ turnHint }}
+        <strong>{{ phaseLabel }}</strong>
+        <span class="status-main">{{ turnHint }}</span>
+        <span v-if="room" class="status-meta">
+          第 {{ board?.index ?? 0 }}/{{ room.config.boards }} 副 ·
+          {{ room.config.scoring === 'mp' ? 'MP' : '贴点' }}
+          <template v-if="board?.dummySeat"> · 明手 {{ board.dummySeat }}</template>
+          <template v-if="room.status === 'finished'">
+            · {{ room.result.winner === 'tie' ? '双方打平' : `${room.result.winner === 'NS' ? '南北' : '东西'}获胜` }}
+          </template>
+          <template v-else-if="canNextBoard">
+            · {{ countdown === null ? '本副结束' : `${countdown}s 后下一副` }}
+          </template>
+        </span>
       </div>
       <span class="connection" :class="store.connection">{{ connectionText }}</span>
-      <el-button :disabled="!room" @click="openScore">成绩与复盘</el-button>
-      <el-button :disabled="!room" @click="chatVisible = true">聊天</el-button>
-      <el-button v-if="canNextBoard" type="primary" @click="store.nextBoard()">开始下一副</el-button>
+      <el-button :disabled="!room" @click="openScore">成绩</el-button>
+      <el-button v-if="canNextBoard" type="primary" @click="store.nextBoard()">下一副</el-button>
       <el-button :disabled="!room" @click="store.requestState()">刷新</el-button>
-      <el-button :disabled="!room" @click="copyCode">复制邀请</el-button>
-      <el-button type="danger" text @click="leave">离开房间</el-button>
+      <el-button :disabled="!room" @click="copyCode">邀请</el-button>
+      <el-button type="danger" text @click="leave">离开</el-button>
     </header>
 
     <el-alert
@@ -264,25 +271,13 @@ function sendChat(): void {
       />
 
       <template v-else>
-        <div class="match-strip">
-          <span>第 {{ board?.index ?? 0 }} / {{ room.config.boards }} 副</span>
-          <span>{{ room.config.scoring === 'mp' ? '双人赛 MP' : '贴点制' }}</span>
-          <span v-if="board?.dummySeat">明手 {{ board.dummySeat }}</span>
-          <span v-if="room.status === 'finished'" class="finished">
-            {{ room.result.winner === 'tie' ? '双方打平' : `${room.result.winner === 'NS' ? '南北' : '东西'} 获胜` }}
-          </span>
-          <span v-else-if="canNextBoard" class="next-hint">
-            {{ countdown === null ? '本副结束' : `${countdown} 秒后自动开始下一副` }}
-          </span>
-        </div>
-
         <main class="app-body">
           <OnlineTable
             :room="room"
             :bidding-rules="biddingRules"
             @play="onPlay"
             @score="openScore"
-            @chat="chatVisible = true"
+            @chat-send="onChatSend"
           />
         </main>
       </template>
@@ -313,25 +308,6 @@ function sendChat(): void {
       <ScoreTable v-if="room" :room="room" @replay="openReplay" />
     </el-dialog>
 
-    <el-dialog v-model="chatVisible" title="房间聊天" width="min(520px, 94vw)" append-to-body>
-      <div class="messages">
-        <p v-for="message in room?.chat ?? []" :key="message.id" class="message">
-          <strong>{{ message.from }}</strong>
-          <span>{{ message.text }}</span>
-        </p>
-        <p v-if="!room?.chat.length" class="hint">还没有消息</p>
-      </div>
-      <div class="chat-input">
-        <el-input
-          v-model="chatText"
-          size="small"
-          maxlength="200"
-          placeholder="说点什么…"
-          @keyup.enter="sendChat"
-        />
-        <el-button size="small" type="primary" @click="sendChat">发送</el-button>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
@@ -339,7 +315,7 @@ function sendChat(): void {
 .room-view {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 .room-header h1 {
   white-space: nowrap;
@@ -347,16 +323,27 @@ function sendChat(): void {
 .room-header .back {
   color: #9ef0bd;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .room-header .code {
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: #ffe19a;
 }
 .room-header .status {
   flex: 1;
-  min-width: 240px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.room-header .status-main {
+  margin-left: 5px;
+}
+.room-header .status-meta {
+  margin-left: 9px;
+  color: rgba(234, 245, 238, 0.62);
+  font-size: 11px;
 }
 .room-header .connection {
   font-size: 11px;
@@ -386,62 +373,10 @@ function sendChat(): void {
   font-size: 12px;
   color: #8a978f;
 }
-.match-strip {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 7px 14px;
-  border-radius: 10px;
-  background: rgba(7, 30, 21, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(234, 245, 238, 0.9);
-  font-size: 12px;
-}
-.match-strip .finished {
-  margin-left: auto;
-  color: #ffe19a;
-  font-weight: 700;
-}
-.match-strip .next-hint {
-  margin-left: auto;
-  color: #ffe19a;
-}
 .card {
   background: var(--paper);
   border-radius: 14px;
   padding: 12px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
-}
-.messages {
-  height: 260px;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 6px;
-  background: #f3f7f4;
-  border-radius: 9px;
-}
-.message {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: #33443a;
-}
-.message strong {
-  color: #14563a;
-  margin-right: 5px;
-}
-.chat-input {
-  display: flex;
-  gap: 5px;
-  margin-top: 8px;
-}
-@media (max-width: 780px) {
-  .room-header .status {
-    order: 5;
-    flex-basis: 100%;
-  }
 }
 </style>

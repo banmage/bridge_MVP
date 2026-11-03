@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { getSuit, type SuitIndex } from '../models/card';
+import { computed, ref } from 'vue';
+import { cardLabel, getSuit, type SuitIndex } from '../models/card';
 import { sortHand } from '../models/hand';
 import type { Position } from '../models/gameState';
 import PlayingCard from './PlayingCard.vue';
 import TurnArrow from './TurnArrow.vue';
+import HintVeil from './HintVeil.vue';
+
+type DisplaySlot = 'north' | 'south' | 'west' | 'east';
 
 const props = defineProps<{
   cards: number[];
   position: Position;
+  /** 相对视角下的显示位置；缺省时与真实座位一致（单机版） */
+  displaySlot?: DisplaySlot;
   /** 是否可点击（由父组件依据 controllableSeats 计算） */
   clickable?: boolean;
   /** 显示牌背（暗手） */
@@ -43,11 +48,36 @@ const rows = computed(() =>
 
 /** 按 ♠ ♥ ♣ ♦ 分组，缺门不占位 */
 const groups = computed(() => rows.value.filter((row) => row.cards.length > 0));
+
+/** 提示箭头按显示方位指向手牌，而不是按真实座位 */
+const arrowPosition = computed<Position>(() => {
+  if (!props.displaySlot) return props.position;
+  return ({ north: 'N', south: 'S', west: 'W', east: 'E' } as const)[props.displaySlot];
+});
+
+const hoverText = ref<string | null>(null);
+
+function hoverCard(card: number): void {
+  if (props.faceDown) return;
+  if (props.recommendedCard === card) {
+    hoverText.value = `推荐出牌：${cardLabel(card)}（系统建议，仅辅助）`;
+  } else if (props.clickable) {
+    hoverText.value = `${cardLabel(card)} · 左键选中，右键或双击出牌`;
+  } else if (props.isDummy) {
+    hoverText.value = `${cardLabel(card)}（明手牌）`;
+  } else {
+    hoverText.value = null;
+  }
+}
+
+function clearHint(): void {
+  hoverText.value = null;
+}
 </script>
 
 <template>
   <div class="hand" :class="[{ 'is-dummy': isDummy, active }, `pos-${position}`]">
-    <TurnArrow v-if="showTurnArrow" :position="position" />
+    <TurnArrow v-if="showTurnArrow && recommendedCard == null" :position="arrowPosition" />
     <div class="hand-inner">
       <div v-if="faceDown" class="cards backs">
         <PlayingCard v-for="i in cards.length" :key="i" back size="xxl" />
@@ -60,23 +90,36 @@ const groups = computed(() => rows.value.filter((row) => row.cards.length > 0));
       >
         <div class="hand-row">
           <span v-for="group in groups" :key="group.suit" class="suit-group">
-            <PlayingCard
+            <span
               v-for="card in group.cards"
               :key="card"
-              :card="card"
-              size="xxl"
-              :clickable="clickable"
-              :active="active && clickable"
-              :selected="selectedCard === card"
-              :recommended="recommendedCard === card"
-              @click="emit('card-click', card)"
-              @dblclick="emit('card-dblclick', card)"
-              @contextmenu.prevent="emit('card-confirm', card)"
-            />
+              class="card-slot"
+              @mouseenter="hoverCard(card)"
+              @mouseleave="clearHint"
+            >
+              <span
+                v-if="recommendedCard === card"
+                class="play-hint-arrow"
+                role="img"
+                aria-label="推荐出牌"
+              >▼</span>
+              <PlayingCard
+                :card="card"
+                size="xxl"
+                :clickable="clickable"
+                :active="active && clickable"
+                :selected="selectedCard === card"
+                @click="emit('card-click', card)"
+                @dblclick="emit('card-dblclick', card)"
+                @contextmenu.prevent="emit('card-confirm', card)"
+              />
+            </span>
           </span>
         </div>
       </div>
     </div>
+
+    <HintVeil :text="hoverText" />
   </div>
 </template>
 
@@ -114,10 +157,46 @@ const groups = computed(() => rows.value.filter((row) => row.cards.length > 0));
   align-items: flex-end;
   flex: none;
 }
+/* 每张牌一个定位槽：推荐箭头可以精确指向某一张牌，且不改变牌的原始位置 */
+.card-slot {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+}
 /* 同花色与跨花色均使用完全相同的叠放距离 */
 .suit-group + .suit-group,
-.suit-group .playing-card + .playing-card {
+.suit-group .card-slot + .card-slot {
   margin-left: var(--card-overlap);
+}
+/* 推荐出牌：牌张留在原位，只有闪烁箭头指向它 */
+.play-hint-arrow {
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  z-index: 30;
+  color: #ff9d1f;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    0 1px 0 #fff,
+    0 0 7px rgba(255, 145, 15, 0.95);
+  transform: translateX(-50%);
+  animation: play-hint-blink 0.8s step-end infinite;
+  pointer-events: none;
+}
+@keyframes play-hint-blink {
+  0%,
+  49.9% {
+    color: #ff9d1f;
+    opacity: 1;
+  }
+  50%,
+  100% {
+    color: #ffffff;
+    opacity: 0.72;
+  }
 }
 .suits.no-events {
   pointer-events: none;
