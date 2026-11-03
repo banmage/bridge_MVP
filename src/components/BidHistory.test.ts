@@ -115,6 +115,7 @@ describe('BidHistory 联网快照模式', () => {
     expect(wrapper.text()).toContain('1♥');
     expect(wrapper.text()).not.toContain('7NT');
     expect(wrapper.get('.bid-cell.alerted').attributes('title')).toContain('约定叫');
+    expect(wrapper.get('.bid-cell.alerted').attributes('title')).toContain('1H 开叫');
     expect(wrapper.get('.bid-cell.thinking .bid-label').text()).toBe('？');
   });
 

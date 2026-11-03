@@ -38,6 +38,14 @@ export interface RoomPlayer {
   token?: string;
 }
 
+/** 被机器人托管的真人座位：保留原主身份，允许同一 playerId 重连后收回 */
+export interface SeatTakeover {
+  playerId: string;
+  name: string;
+  /** 接管发生时间（epoch ms） */
+  at: number;
+}
+
 export interface Room {
   code: string;
   hostId: string;
@@ -48,6 +56,8 @@ export interface Room {
   chat: ChatMessage[];
   /** 加入顺序（首位为房主），用于房主转移 */
   joinOrder: string[];
+  /** 超时托管记录：座位 → 原真人身份（主动离开不记录） */
+  takeovers: Partial<Record<Position, SeatTakeover>>;
   createdAt: number;
   updatedAt: number;
   /** 结算后自动开下一副的时间（epoch ms） */
@@ -141,6 +151,10 @@ export class RoomManager {
       })) {
         return room;
       }
+      // 被托管但保留原主身份：重连时仍需找回房间以自动收回座位
+      if (POSITIONS.some((pos) => room.takeovers[pos]?.playerId === playerId)) {
+        return room;
+      }
     }
     return null;
   }
@@ -187,6 +201,7 @@ export class RoomManager {
       match: null,
       chat: [],
       joinOrder: [player.playerId],
+      takeovers: {},
       createdAt: now,
       updatedAt: now,
       nextBoardAt: null,
@@ -208,6 +223,9 @@ export class RoomManager {
       room.updatedAt = this.now();
       return room;
     }
+
+    // 座位曾被超时托管：同一身份回来时优先收回原座位（开赛后也允许）
+    if (this.reclaimSeat(room, player.playerId)) return room;
 
     if (room.status !== 'lobby') {
       throw new MatchError('WRONG_PHASE', '比赛已开始，无法加入');
@@ -235,6 +253,10 @@ export class RoomManager {
     const room = code ? this.getRoom(code) : this.findRoomOf(playerId);
     if (!room) throw new MatchError('NOT_IN_ROOM', '你不在任何房间中');
     this.awaySince.delete(playerId);
+    // 主动离开是明确意愿：撤销该身份的座位收回权
+    for (const pos of POSITIONS) {
+      if (room.takeovers[pos]?.playerId === playerId) delete room.takeovers[pos];
+    }
 
     const seat = this.seatOf(room, playerId);
     room.joinOrder = room.joinOrder.filter((id) => id !== playerId);
@@ -250,8 +272,8 @@ export class RoomManager {
       return room;
     }
 
-    // 开赛后离开：机器人接管，保证比赛可完成
-    if (seat) this.takeover(room, seat);
+    // 开赛后离开：机器人接管，保证比赛可完成（主动离开不保留收回权）
+    if (seat) this.takeover(room, seat, false);
     room.updatedAt = this.now();
     return room;
   }
@@ -273,6 +295,8 @@ export class RoomManager {
   markConnected(playerId: string): Room | null {
     const room = this.findRoomOf(playerId);
     if (!room) return null;
+    // 超时托管后重连：自动收回原座位，避免人类回来却只能看机器人替自己打
+    if (this.reclaimSeat(room, playerId)) return room;
     const seat = this.seatOf(room, playerId);
     if (seat) {
       const current = room.seats[seat];
@@ -500,12 +524,17 @@ export class RoomManager {
    * 内部
    * ---------------------------------------------------------------- */
 
-  private takeover(room: Room, seat: Position): void {
+  private takeover(room: Room, seat: Position, reclaimable = true): void {
     const current = room.seats[seat];
     const name = current.kind === 'human' ? current.name : '玩家';
     const previousPlayerId = current.kind === 'human' ? current.playerId : null;
     const persona = defaultPersonaFor(`${name}的托管`, `takeover-${seat}-${this.now()}`);
     room.seats[seat] = { kind: 'bot', persona };
+    if (previousPlayerId && reclaimable) {
+      room.takeovers[seat] = { playerId: previousPlayerId, name, at: this.now() };
+    } else {
+      delete room.takeovers[seat];
+    }
     if (room.match) {
       room.match.takeoverSeat(seat, persona);
       room.match.seats = { ...room.match.seats };
@@ -513,6 +542,34 @@ export class RoomManager {
     if (previousPlayerId && room.hostId === previousPlayerId) {
       this.reassignHost(room);
     }
+  }
+
+  /**
+   * 收回被托管的座位：仅限同一身份，且该座位当前仍是机器人。
+   * 返回是否成功；成功后清除托管记录并同步到比赛引擎。
+   */
+  private reclaimSeat(room: Room, playerId: string): boolean {
+    const seat = POSITIONS.find((pos) => room.takeovers[pos]?.playerId === playerId);
+    if (!seat) return false;
+    const info = room.takeovers[seat]!;
+    if (room.seats[seat].kind !== 'bot') {
+      delete room.takeovers[seat];
+      return false;
+    }
+    room.seats[seat] = {
+      kind: 'human',
+      playerId,
+      name: info.name,
+      connected: true,
+    };
+    delete room.takeovers[seat];
+    this.awaySince.delete(playerId);
+    if (!room.joinOrder.includes(playerId)) room.joinOrder.push(playerId);
+    // 原房主被托管后房主已转给他人；只有在无人可当房主时才补位
+    if (!room.hostId) room.hostId = playerId;
+    if (room.match) room.match.reclaimSeat(seat, playerId, info.name);
+    room.updatedAt = this.now();
+    return true;
   }
 
   /** 房主失效后转给仍在座的真人家；无真人时置空，避免“幽灵房主”找回房间 */

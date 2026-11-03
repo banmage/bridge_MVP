@@ -191,6 +191,36 @@ describe('视角投影：房间与座位', () => {
     expect(view.result.boardsPlayed).toBe(0);
   });
 
+  it('超时托管的座位仅向原身份暴露 reclaimableSeat', () => {
+    let clock = 1_000;
+    const manager = new RoomManager({ seedBase: 1, codes: ['ROOM03'], now: () => clock });
+    const room = manager.createRoom({ playerId: 'p-host', name: '房主' }, { boards: 12, scoring: 'mp' }, 'N');
+    for (const pos of ['E', 'S', 'W'] as Position[]) {
+      manager.setSeat('p-host', 'ROOM03', pos, {
+        kind: 'bot',
+        persona: { ...BOT, id: `bot-${pos}` },
+      });
+    }
+    manager.startMatch('p-host', 'ROOM03');
+
+    manager.markDisconnected('p-host');
+    clock += 60_000;
+    expect(manager.takeoverExpired(room, 60_000)).toBe(true);
+
+    const mine = projectRoomView(room, 'p-host');
+    expect(mine.you.seat).toBeNull();
+    expect(mine.you.name).toBe('房主');
+    expect(mine.you.reclaimableSeat).toBe('N');
+    // 其他玩家看不到别人的收回权
+    expect(projectRoomView(room, 'stranger').you.reclaimableSeat).toBeUndefined();
+
+    manager.markConnected('p-host');
+    const reclaimed = projectRoomView(room, 'p-host');
+    expect(reclaimed.you.seat).toBe('N');
+    expect(reclaimed.you.reclaimableSeat).toBeUndefined();
+    expect(reclaimed.seats.N.kind).toBe('human');
+  });
+
   it('projectBoardView 在未开局时返回 null', () => {
     const manager = new RoomManager({ seedBase: 1, codes: ['ROOM02'] });
     const room = manager.createRoom({ playerId: 'p-N', name: '北家' }, { boards: 12, scoring: 'mp' }, 'N');

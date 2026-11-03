@@ -151,7 +151,13 @@ export interface RoomView {
   code: string;
   status: RoomStatus;
   hostId: string;
-  you: { playerId: string; name: string; seat: Position | null };
+  you: {
+    playerId: string;
+    name: string;
+    seat: Position | null;
+    /** 若原座位已被超时托管，给出可收回的座位（同一身份重连时自动收回） */
+    reclaimableSeat?: Position | null;
+  };
   config: MatchConfig;
   seats: Record<Position, SeatView>;
   board: BoardView | null;

@@ -79,6 +79,15 @@
 - [x] T047 `server/__tests__/roomSnapshot.test.ts`：落盘/恢复/托管/损坏跳过/引擎续跑/GameHub 重连
 - [x] T048 文档同步：`ROOM_DATA_DIR`、重启恢复流程、评审与验收记录
 
+## Phase 10: 布局、人类辅助与托管座位收回（CR-007 / CR-008）
+
+- [x] T049 联网牌桌对齐单机版布局与交互（叫牌纸/牌局信息/手牌停靠）
+- [x] T050 `src/core/bidding/hints.ts` + `src/ai/playHint.ts`：叫品解释/推荐、固定种子出牌推荐；
+  `BiddingBox/BidHistory/Hand/PlayingCard/Table/OnlineTable` 接入与测试
+- [x] T051 `Room.takeovers` + `RoomManager.reclaimSeat`：超时托管后原身份重连/入房自动收回，
+  主动离开放弃；`RoomView.you.reclaimableSeat` + 提示条「收回座位」
+- [x] T052 快照保存托管记录；文档同步（README、`docs/联网对战.md`、`docs/online-mvp/01..07`、spec FR-007/FR-029）
+
 ## 依赖关系
 
 - Phase 2 阻塞 Phase 3/5。
@@ -92,8 +101,8 @@
 |----------|------|
 | US1 建房开赛 | T016, T019–T021, T027–T028 |
 | US2 AI 人格 | T010, T016, T031 |
-| US3 双真人对抗 | T017–T018, T022, T023–T024 |
-| US4 实时叫牌打牌 | T011–T012, T029–T030 |
+| US3 双真人对抗 | T017–T018, T022, T023–T024, T051 |
+| US4 实时叫牌打牌 | T011–T012, T029–T030, T049–T050 |
 | US5 成绩与复盘 | T013, T021, T032–T035 |
 | US6 大厅 | T027, T036 |
 
@@ -119,3 +128,9 @@
   - `npm test`：35 个测试文件、**363 tests passed**；`npm run typecheck`、`npm run typecheck:server`、
     `npm run build` 全部通过；
   - 文档同步：README、`docs/联网对战.md`、`docs/online-mvp/01..07`、quickstart、spec（FR-028）。
+- **T049–T052 布局/人类辅助/座位收回（CR-007 / CR-008，2026-11-02）**：
+  - 联网牌桌与单人版统一布局；叫牌卡按规则库推荐并预选（不自动提交）、叫牌表悬停解释，
+    出牌时金色箭头标出推荐合法牌；辅助只读且只使用本人/已公开明手牌；
+  - 超时托管记录原身份并写入快照，原身份重连自动收回座位，主动离开放弃；牌桌提示条支持手动收回；
+  - `npm test`：38 个测试文件、**392 tests passed**；`npm run typecheck`、`npm run typecheck:server`、
+    `npm run build` 全部通过。

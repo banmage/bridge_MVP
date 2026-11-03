@@ -126,6 +126,33 @@ describe('加入与座位', () => {
     expect(rejoined.seats.N.kind).toBe('human');
     if (rejoined.seats.N.kind === 'human') expect(rejoined.seats.N.connected).toBe(true);
   });
+
+  it('开赛后超时被托管的座位可由原身份收回', () => {
+    let clock = 1_000;
+    const m = new RoomManager({ seedBase: 1, codes: ['ABC123'], now: () => clock });
+    const room = m.createRoom(
+      { playerId: 'p-host', name: '房主' },
+      { boards: 12, scoring: 'hcp-points' },
+      'S',
+    );
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+
+    m.markDisconnected('p-host');
+    clock += 60_000;
+    expect(m.takeoverExpired(room, 60_000)).toBe(true);
+    expect(room.seats.S.kind).toBe('bot');
+    expect(room.match!.seats.S.kind).toBe('bot');
+
+    const reclaimed = m.joinRoom({ playerId: 'p-host', name: '房主' }, 'ABC123');
+    expect(reclaimed.seats.S.kind).toBe('human');
+    if (reclaimed.seats.S.kind === 'human') {
+      expect(reclaimed.seats.S.playerId).toBe('p-host');
+      expect(reclaimed.seats.S.connected).toBe(true);
+    }
+    expect(reclaimed.match!.seats.S.kind).toBe('human');
+    expect(reclaimed.hostId).toBe('p-host');
+  });
 });
 
 describe('房主转移与离开', () => {
@@ -188,7 +215,14 @@ describe('房主转移与离开', () => {
     expect(room.seats.S.kind).toBe('bot');
     expect(room.match!.seats.S.kind).toBe('bot');
     expect(room.hostId).toBe('');
-    expect(m.findRoomOf('p-host')).toBeNull();
+    expect(m.findRoomOf('p-host')).toBe(room);
+
+    // 原玩家重连：自动收回被托管的座位，比赛继续由本人操作
+    expect(m.markConnected('p-host')).toBe(room);
+    expect(room.seats.S.kind).toBe('human');
+    if (room.seats.S.kind === 'human') expect(room.seats.S.connected).toBe(true);
+    expect(room.match!.seats.S.kind).toBe('human');
+    expect(room.hostId).toBe('p-host');
   });
 
   it('房主断线被托管后，房主转给仍在座真人', () => {

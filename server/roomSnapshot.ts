@@ -40,6 +40,8 @@ export interface RoomSnapshot {
     seats: Room['seats'];
     chat: Room['chat'];
     joinOrder: string[];
+    /** 超时托管记录（旧快照可能没有） */
+    takeovers?: Room['takeovers'];
     createdAt: number;
     updatedAt: number;
     nextBoardAt: number | null;
@@ -119,6 +121,20 @@ function isSeatMap(value: unknown): boolean {
   return isObject(value) && POSITIONS.every((pos) => isSeat(value[pos]));
 }
 
+function isTakeover(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    typeof value.playerId === 'string' &&
+    typeof value.name === 'string' &&
+    isNumber(value.at)
+  );
+}
+
+function isTakeoverMap(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return POSITIONS.every((pos) => value[pos] === undefined || isTakeover(value[pos]));
+}
+
 function isEngineSeat(value: unknown): boolean {
   if (!isObject(value)) return false;
   if (value.kind === 'human') {
@@ -185,6 +201,7 @@ function assertSnapshot(value: unknown): asserts value is RoomSnapshot {
   }
   if (!isConfig(room.config)) throw new Error('房间配置非法');
   if (!isSeatMap(room.seats)) throw new Error('房间座位非法');
+  if (room.takeovers !== undefined && !isTakeoverMap(room.takeovers)) throw new Error('托管记录非法');
   if (!Array.isArray(room.chat) || !Array.isArray(room.joinOrder)) throw new Error('房间聊天/加入顺序非法');
   if (!room.joinOrder.every((id) => typeof id === 'string')) throw new Error('加入顺序非法');
   if (!isNumber(room.createdAt) || !isNumber(room.updatedAt)) throw new Error('房间时间非法');
@@ -204,6 +221,7 @@ export function snapshotRoom(room: Room): RoomSnapshot {
       seats: clone(room.seats),
       chat: room.chat.map((message) => ({ ...message })),
       joinOrder: [...room.joinOrder],
+      takeovers: clone(room.takeovers ?? {}),
       createdAt: room.createdAt,
       updatedAt: room.updatedAt,
       nextBoardAt: room.nextBoardAt,
@@ -230,6 +248,7 @@ export function roomFromSnapshot(snapshot: RoomSnapshot, opts: RestoreRoomOption
     match,
     chat: snapshot.room.chat.map((message) => ({ ...message })),
     joinOrder: [...snapshot.room.joinOrder],
+    takeovers: clone(snapshot.room.takeovers ?? {}),
     createdAt: snapshot.room.createdAt,
     updatedAt: snapshot.room.updatedAt,
     nextBoardAt: snapshot.room.nextBoardAt,

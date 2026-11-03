@@ -21,6 +21,8 @@ const props = defineProps<{
   selectedCard?: number | null;
   /** 是否显示指向该手牌的“轮到你出牌”闪烁箭头 */
   showTurnArrow?: boolean;
+  /** 系统推荐打出的牌（仅在该手牌内显示金色箭头） */
+  recommendedCard?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -66,6 +68,7 @@ const groups = computed(() => rows.value.filter((row) => row.cards.length > 0));
               :clickable="clickable"
               :active="active && clickable"
               :selected="selectedCard === card"
+              :recommended="recommendedCard === card"
               @click="emit('card-click', card)"
               @dblclick="emit('card-dblclick', card)"
               @contextmenu.prevent="emit('card-confirm', card)"

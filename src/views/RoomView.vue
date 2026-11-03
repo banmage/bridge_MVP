@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { BidCall, Position, RoomView } from '@shared/protocol';
 import { lastBidOf } from '../core/bidding/validator';
+import { loadBiddingRules } from '../engine/loader';
 import { useOnlineStore } from '../store/online';
 import OnlineTable from '../components/online/OnlineTable.vue';
 import BiddingBox from '../components/BiddingBox.vue';
@@ -20,6 +21,9 @@ const chatVisible = ref(false);
 const scoreVisible = ref(false);
 const chatText = ref('');
 const now = ref(Date.now());
+
+/** 联网牌桌的规则提示统一使用默认精确体系（服务端默认体系） */
+const biddingRules = loadBiddingRules();
 
 let clock: ReturnType<typeof setInterval> | null = null;
 let joinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -41,6 +45,11 @@ const countdown = computed(() => {
 
 const canNextBoard = computed(
   () => board.value?.phase === 'scored' && room.value?.status === 'playing',
+);
+
+/** 原座位被超时托管时，服务端允许同一身份重新收回 */
+const reclaimableSeat = computed<Position | null>(
+  () => (isMine.value ? room.value?.you.reclaimableSeat ?? null : null),
 );
 
 const connectionText = computed(
@@ -211,6 +220,21 @@ function sendChat(): void {
       @close="store.clearError()"
     />
 
+    <el-alert
+      v-if="reclaimableSeat && room"
+      class="reclaim-bar"
+      type="warning"
+      :closable="false"
+      show-icon
+    >
+      <template #title>
+        你的 {{ reclaimableSeat }} 座因断线超时已被系统托管
+        <el-button size="small" type="warning" @click="store.joinRoom(room.code, reclaimableSeat)">
+          收回座位
+        </el-button>
+      </template>
+    </el-alert>
+
     <div class="toasts">
       <el-alert
         v-for="toast in store.toasts"
@@ -253,7 +277,13 @@ function sendChat(): void {
         </div>
 
         <main class="app-body">
-          <OnlineTable :room="room" @play="onPlay" @score="openScore" @chat="chatVisible = true" />
+          <OnlineTable
+            :room="room"
+            :bidding-rules="biddingRules"
+            @play="onPlay"
+            @score="openScore"
+            @chat="chatVisible = true"
+          />
         </main>
       </template>
     </template>
@@ -266,6 +296,8 @@ function sendChat(): void {
       :current-bidder="board.currentBidder"
       :can-bid="board.canAct"
       :title="bidderLabel"
+      :hand="board.yourHand"
+      :bidding-rules="biddingRules"
       @submit="onBid"
     />
 
@@ -335,6 +367,9 @@ function sendChat(): void {
   color: #ff9f92;
 }
 .error-bar {
+  border-radius: 12px;
+}
+.reclaim-bar {
   border-radius: 12px;
 }
 .toasts {

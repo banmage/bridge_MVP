@@ -4,6 +4,7 @@ import { useGameStore } from '../store/game';
 import { getSide, type Position } from '../models/gameState';
 import { getSuit } from '../models/card';
 import { isCardLegal } from '../core/playing';
+import { recommendPlay } from '../ai/playHint';
 import Hand from './Hand.vue';
 import BidHistory from './BidHistory.vue';
 import ContractDisplay from './ContractDisplay.vue';
@@ -116,6 +117,30 @@ const tricksBySide = computed(() => {
 /** 出牌阶段把叫牌过程停靠到北家手牌右侧，与左侧信息栏对称 */
 const isPlaying = computed(() => store.phase === 'play' || store.phase === 'play_waiting_lead');
 const showPlayBidHistory = computed(() => isPlaying.value && store.biddingHistory.length > 0);
+
+/** 出牌推荐：只在轮到人类控制座位时显示，复用机器人出牌 AI */
+const recommendedCard = computed<number | null>(() => {
+  const contract = store.contract;
+  const pos = store.nextPlayer;
+  if (!contract || !pos || !isPlaying.value || store.isAiThinking) return null;
+  if (!store.controlledSeats().includes(pos)) return null;
+  const hand = store.hands[pos];
+  if (!hand || hand.length === 0) return null;
+  return recommendPlay(
+    {
+      hand,
+      dummyHand: store.dummyOpen ? store.hands[contract.dummy] : null,
+      currentTrick: store.currentTrick,
+      contract,
+      position: pos,
+      declarerTricks: store.declarerTricksWon(),
+      biddingHistory: store.biddingHistory,
+      seed: store.gamesPlayed * 1000 + store.tricks.length * 53 + store.currentTrick.length * 7 + 1,
+      style: store.styles[pos]?.play,
+    },
+    store.leadRules.rules,
+  );
+});
 </script>
 
 <template>
@@ -135,6 +160,7 @@ const showPlayBidHistory = computed(() => isPlaying.value && store.biddingHistor
         :active="isActive('N')"
         :show-turn-arrow="showTurnArrow('N')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('N', c)"
         @card-confirm="(c) => onCardConfirm('N', c)"
         @card-dblclick="(c) => onCardDoubleClick('N', c)"
@@ -185,6 +211,7 @@ const showPlayBidHistory = computed(() => isPlaying.value && store.biddingHistor
         :active="isActive('W')"
         :show-turn-arrow="showTurnArrow('W')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('W', c)"
         @card-confirm="(c) => onCardConfirm('W', c)"
         @card-dblclick="(c) => onCardDoubleClick('W', c)"
@@ -229,6 +256,7 @@ const showPlayBidHistory = computed(() => isPlaying.value && store.biddingHistor
         :active="isActive('E')"
         :show-turn-arrow="showTurnArrow('E')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('E', c)"
         @card-confirm="(c) => onCardConfirm('E', c)"
         @card-dblclick="(c) => onCardDoubleClick('E', c)"
@@ -246,6 +274,7 @@ const showPlayBidHistory = computed(() => isPlaying.value && store.biddingHistor
         :active="isActive('S')"
         :show-turn-arrow="showTurnArrow('S')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('S', c)"
         @card-confirm="(c) => onCardConfirm('S', c)"
         @card-dblclick="(c) => onCardDoubleClick('S', c)"

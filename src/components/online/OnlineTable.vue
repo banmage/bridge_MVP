@@ -2,9 +2,12 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import type { CardPlay, Position } from '../../models/gameState';
 import type { RoomView } from '@shared/protocol';
+import type { BiddingRule, LeadRule } from '../../engine/types';
+import { loadLeadRules } from '../../engine/loader';
 import { describeCall, describeContract, vulName } from '@shared/format';
 import { getSuit } from '../../models/card';
 import { isCardLegal } from '../../core/playing';
+import { declarerTricksOf, recommendPlay } from '../../ai/playHint';
 import { PLAY_DISPLAY_MS } from '../../store/game';
 import Hand from '../Hand.vue';
 import BidHistory from '../BidHistory.vue';
@@ -22,12 +25,23 @@ import OnlineSouthPlayed from './OnlineSouthPlayed.vue';
  * 数据全部来自服务端 `RoomView` 快照，不在客户端推导隐藏信息。
  */
 
-const props = defineProps<{ room: RoomView }>();
+const props = defineProps<{
+  room: RoomView;
+  /** 本桌叫牌规则资产（用于叫牌过程与叫牌卡的悬停解释） */
+  biddingRules?: BiddingRule[] | null;
+}>();
 const emit = defineEmits<{
   (e: 'play', card: number): void;
   (e: 'score'): void;
   (e: 'chat'): void;
 }>();
+
+/** 首攻规则只解析一次，供出牌推荐复用 */
+let cachedLeadRules: LeadRule[] | null = null;
+function leadRulesForHints(): LeadRule[] {
+  if (!cachedLeadRules) cachedLeadRules = loadLeadRules();
+  return cachedLeadRules;
+}
 
 const SEAT_CN: Record<Position, string> = { N: '北', E: '东', S: '南', W: '西' };
 const VUL_TEXT: Record<string, string> = {
@@ -273,6 +287,31 @@ const showPlayBidHistory = computed(
   () => isPlaying.value && (board.value?.bidding.length ?? 0) > 0,
 );
 
+/**
+ * 出牌推荐：仅在轮到人类操作时计算，复用机器人出牌 AI。
+ * 固定 seed 保证同一局面推荐稳定，不会每次渲染跳动。
+ */
+const recommendedCard = computed<number | null>(() => {
+  const b = board.value;
+  if (!b || !b.canAct || !b.contract || !b.actingForSeat) return null;
+  if (b.phase !== 'play' && b.phase !== 'play_waiting_lead') return null;
+  const acting = b.actingForSeat;
+  let hand: number[] | null = null;
+  if (acting === b.yourSeat) hand = b.yourHand;
+  else if (acting === b.dummySeat && b.dummyOpen) hand = b.dummyHand;
+  if (!hand || hand.length === 0) return null;
+  return recommendPlay({
+    hand,
+    dummyHand: b.dummyOpen ? b.dummyHand : null,
+    currentTrick: b.currentTrick,
+    contract: b.contract,
+    position: acting,
+    declarerTricks: declarerTricksOf(b.tricks, b.contract.declarer),
+    biddingHistory: b.bidding,
+    seed: b.index * 1000 + b.tricks.length * 53 + b.currentTrick.length * 7 + 1,
+  }, leadRulesForHints());
+});
+
 /** 最近一条带约定提醒的叫牌，用于在牌桌上直接解释含义 */
 const latestAlert = computed(() => {
   const bidding = board.value?.bidding ?? [];
@@ -309,6 +348,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :active="isActive('N')"
         :show-turn-arrow="showTurnArrow('N')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('N', c)"
         @card-confirm="(c) => onCardConfirm('N', c)"
         @card-dblclick="(c) => onCardDoubleClick('N', c)"
@@ -347,6 +387,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :bidding-history="board?.bidding ?? []"
         :phase="board?.phase ?? 'play'"
         :current-bidder="board?.currentBidder ?? null"
+        :bidding-rules="biddingRules ?? null"
       />
       <div v-if="latestAlert" class="bid-alert-note" :title="latestAlert.text">
         <span class="alert-tag">提醒</span>
@@ -370,6 +411,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :active="isActive('W')"
         :show-turn-arrow="showTurnArrow('W')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('W', c)"
         @card-confirm="(c) => onCardConfirm('W', c)"
         @card-dblclick="(c) => onCardDoubleClick('W', c)"
@@ -386,6 +428,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :bidding-history="board?.bidding ?? []"
         :phase="board?.phase ?? 'bidding'"
         :current-bidder="board?.currentBidder ?? null"
+        :bidding-rules="biddingRules ?? null"
       />
 
       <div v-else-if="board && cardsVisible" class="trick-board">
@@ -433,6 +476,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :active="isActive('E')"
         :show-turn-arrow="showTurnArrow('E')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('E', c)"
         @card-confirm="(c) => onCardConfirm('E', c)"
         @card-dblclick="(c) => onCardDoubleClick('E', c)"
@@ -451,6 +495,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :active="isActive('S')"
         :show-turn-arrow="showTurnArrow('S')"
         :selected-card="selectedCard"
+        :recommended-card="recommendedCard"
         @card-click="(c) => onCardClick('S', c)"
         @card-confirm="(c) => onCardConfirm('S', c)"
         @card-dblclick="(c) => onCardDoubleClick('S', c)"

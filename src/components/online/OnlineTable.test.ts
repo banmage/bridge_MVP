@@ -230,4 +230,29 @@ describe('OnlineTable 联网牌桌布局', () => {
     await card.trigger('dblclick');
     expect(wrapper.emitted('play')?.[0]).toEqual([parseHand('SA')[0]]);
   });
+
+  it('轮到人类操作时标出推荐牌，非操作状态不显示', async () => {
+    const board = makeBoard({
+      phase: 'play',
+      nextPlayer: 'S',
+      canAct: true,
+      actingForSeat: 'S',
+      contract: { level: 1, suit: 'NT', doubled: false, redoubled: false, declarer: 'S', dummy: 'N' },
+      currentTrick: [{ position: 'W', card: parseHand('SK')[0] }],
+      yourHand: parseHand('SA H2'),
+    });
+
+    const active = mountTable(board);
+    await active.vm.$nextTick();
+    const recommended = active.get('.hand.pos-S .playing-card.recommended');
+    expect(recommended.attributes('title')).toBe('推荐出牌');
+    expect(recommended.get('.pc-recommend-arrow').text()).toBe('▼');
+    // 必须跟黑桃，推荐只能是 ♠A
+    expect(recommended.attributes('data-suit')).toBe('♠');
+    expect(recommended.attributes('data-rank')).toBe('A');
+
+    const idle = mountTable({ ...board, canAct: false, actingForSeat: null });
+    await idle.vm.$nextTick();
+    expect(idle.find('.playing-card.recommended').exists()).toBe(false);
+  });
 });

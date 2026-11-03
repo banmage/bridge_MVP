@@ -150,6 +150,31 @@ describe('进行中房间快照', () => {
     expect(restored.seats.S.kind).toBe('bot');
     expect(restored.hostId).toBe('');
     expect(restored.match?.seats.S.kind).toBe('bot');
+
+    // 托管记录随房间保存在内存中：原身份重连后收回
+    restoredManager.markConnected('p-host');
+    expect(restored.seats.S.kind).toBe('human');
+    expect(restored.match?.seats.S.kind).toBe('human');
+    expect(restored.hostId).toBe('p-host');
+  });
+
+  it('托管记录会写入快照，服务端重启后仍可收回座位', () => {
+    let clock = 1_000;
+    const manager = new RoomManager({ seedBase: 7, codes: ['SNAP04'], now: () => clock });
+    const room = playingRoom(manager, 'SNAP04');
+    manager.markDisconnected('p-host');
+    clock += 60_000;
+    expect(manager.takeoverExpired(room, 60_000)).toBe(true);
+    saveRoomSnapshot(room);
+
+    const restoredManager = new RoomManager({ seedBase: 7, now: () => clock });
+    expect(restoredManager.restoreRooms(loadRoomSnapshots())).toBe(1);
+    const restored = restoredManager.getRoom('SNAP04');
+    expect(restored.seats.S.kind).toBe('bot');
+
+    restoredManager.markConnected('p-host');
+    expect(restored.seats.S.kind).toBe('human');
+    expect(restored.match?.seats.S.kind).toBe('human');
   });
 
   it('损坏快照会被跳过，且支持删除', () => {

@@ -5,6 +5,8 @@ import { nextTick } from 'vue';
 import ElementPlus from 'element-plus';
 import BiddingBox from './BiddingBox.vue';
 import { useGameStore } from '../store/game';
+import { loadBiddingRules } from '../engine/loader';
+import { parseHand } from '../testing/testUtils';
 
 function setup() {
   const pinia = createPinia();
@@ -25,6 +27,30 @@ describe('BiddingBox 叫牌浮窗', () => {
     expect(wrapper.find('.flow-notice').exists()).toBe(false);
     expect(wrapper.find('.final-contract').exists()).toBe(false);
     expect(wrapper.find('.contract').exists()).toBe(false);
+  });
+
+  it('轮到人类时显示自动推荐，并高亮对应叫牌卡', async () => {
+    const { store, wrapper } = setup();
+    store.biddingHistory = [];
+    store.currentBid = null;
+    store.currentBidder = 'S';
+    await nextTick();
+
+    const recommend = wrapper.get('[data-testid="bid-recommendation"]');
+    expect(recommend.text()).toContain('推荐');
+    expect(wrapper.findAll('.bid-btn.recommended, .special-btn.recommended').length).toBeGreaterThan(0);
+  });
+
+  it('叫牌卡悬停显示规则解释', async () => {
+    const { store, wrapper } = setup();
+    store.biddingHistory = [];
+    store.currentBid = null;
+    store.currentBidder = 'S';
+    await nextTick();
+
+    const oneClub = wrapper.get('button.bid-btn[data-level="1"][data-suit="C"]');
+    expect(oneClub.attributes('title')).toContain('精确 1C 开叫');
+    expect(wrapper.get('.special-btn.pass').attributes('title')).toContain('Pass');
   });
 
   it('拖动标题栏可移动浮窗，松开后结束拖动', async () => {
@@ -178,6 +204,17 @@ describe('BiddingBox 联网模式（外部快照）', () => {
 
     expect(store.biddingHistory).toHaveLength(before);
     expect(wrapper.emitted('submit')?.[0]).toEqual([{ type: 'bid', level: 1, suit: 'S' }, undefined]);
+  });
+
+  it('外部模式使用传入的手牌与规则生成推荐和悬停解释', () => {
+    const hand = parseHand('SAKQ2 HAK3 D5432 C87'); // 16 HCP
+    const rules = loadBiddingRules('precision');
+    const { wrapper } = setupExternal({ hand, biddingRules: rules });
+
+    expect(wrapper.get('[data-testid="bid-recommendation"]').text()).toContain('精确 1C 开叫');
+    expect(
+      wrapper.get('button.bid-btn[data-level="1"][data-suit="C"]').attributes('title'),
+    ).toContain('精确 1C 开叫');
   });
 
   it('外部模式下“确认+提醒”把提醒文本一并提交', async () => {

@@ -641,6 +641,14 @@ export class MatchEngine {
     }
   }
 
+  /** 原玩家重连收回被托管的座位，比赛从当前局面继续 */
+  reclaimSeat(seat: Position, playerId: string, name: string): void {
+    this.seats[seat] = { kind: 'human', playerId, name };
+    if (this.board) {
+      this.board.message = `${name} 已收回 ${seat} 座`;
+    }
+  }
+
   seatOfPlayer(playerId: string): Position | null {
     for (const pos of SIMPLE_ORDER) {
       const seat = this.seats[pos];

@@ -162,6 +162,23 @@ describe('Table 出牌显示', () => {
     expect(play.get('.playing-card').classes()).toContain('red');
     expect(play.get('.playing-card').classes()).toContain('size-xxl');
   });
+
+  it('轮到人类出牌时标出推荐牌', async () => {
+    const { store, wrapper } = newStoreAndTable();
+    store.phase = 'play';
+    store.contract = { level: 1, suit: 'NT', doubled: false, redoubled: false, declarer: 'S', dummy: 'N' };
+    store.nextPlayer = 'S';
+    store.currentTrick = [{ position: 'W', card: parseHand('SK')[0] }];
+    store.hands.S = parseHand('SA H2');
+    await nextTick();
+
+    const recommended = wrapper.find('.hand.pos-S .playing-card.recommended');
+    expect(recommended.exists()).toBe(true);
+    expect(recommended.attributes('title')).toBe('推荐出牌');
+    // 西家首攻 ♠K，南家必须跟黑桃，推荐只能是 ♠A
+    expect(recommended.attributes('data-suit')).toBe('♠');
+    expect(recommended.attributes('data-rank')).toBe('A');
+  });
 });
 
 describe('Table 出牌阶段叫牌过程', () => {

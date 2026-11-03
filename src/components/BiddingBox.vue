@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGameStore } from '../store/game';
-import { isCallLegal } from '../core/bidding/validator';
-import type { BidCall, BidRecord, BidSuit, Position } from '../models/gameState';
+import { callToString, isCallLegal } from '../core/bidding/validator';
+import { buildCallHints, callLabel, recommendCall, type BidRecommendation } from '../core/bidding/hints';
+import type { BiddingRule } from '../engine/types';
+import type { BidCall, BidRecord, BidSuit, Position, StyleLevel } from '../models/gameState';
 import { getSavedBiddingPopupPosition, saveBiddingPopupPosition } from './biddingPopupPosition';
 
 /**
@@ -19,6 +21,10 @@ const props = withDefaults(
     canBid?: boolean;
     thinking?: boolean;
     title?: string;
+    /** 当前叫牌人的手牌；联网模式由服务端快照传入 */
+    hand?: number[] | null;
+    /** 本桌叫牌规则资产；缺省使用单机 store 的规则 */
+    biddingRules?: BiddingRule[] | null;
   }>(),
   {
     biddingHistory: null,
@@ -27,6 +33,8 @@ const props = withDefaults(
     canBid: true,
     thinking: false,
     title: '',
+    hand: null,
+    biddingRules: null,
   },
 );
 
@@ -57,13 +65,59 @@ const selectedCall = ref<BidCall | null>(null);
 /** “确认+提醒”可附带的提醒说明 */
 const alertText = ref('');
 
-/** 回合或阶段变化后清空选择，避免把旧叫品带到下一手 */
+/** 本桌规则资产：联网模式由父组件传入，单机模式使用 store 当前规则文件 */
+const rules = computed<BiddingRule[]>(() => props.biddingRules ?? store.biddingRules?.rules ?? []);
+/** 当前叫牌人的手牌：用于生成具体叫品解释与推荐 */
+const hand = computed<number[] | null>(() => {
+  if (props.hand) return props.hand;
+  if (external.value) return null;
+  return store.hands[currentBidder.value] ?? null;
+});
+/** 推荐沿用本座位的叫牌风格；联网模式固定“正常” */
+const styleLevel = computed<StyleLevel>(() => {
+  if (external.value) return 1;
+  return store.styles[currentBidder.value]?.bid ?? 1;
+});
+
+/** 每个叫品在当前序列下的解释（键为 validator 的 callToString 结果） */
+const hints = computed<Record<string, string>>(() => {
+  if (!isHumanTurn.value) return {};
+  return buildCallHints(
+    rules.value,
+    hand.value,
+    biddingHistory.value,
+    currentBidder.value,
+    currentBid.value,
+  );
+});
+
+/** 自动推荐：只高亮/预选，绝不自动提交 */
+const recommendation = computed<BidRecommendation | null>(() => {
+  if (!isHumanTurn.value) return null;
+  return recommendCall(
+    rules.value,
+    hand.value,
+    biddingHistory.value,
+    currentBidder.value,
+    currentBid.value,
+    styleLevel.value,
+  );
+});
+
+/** 回合变化时清空选择，并把推荐叫品预选为当前选择 */
 watch(
-  [currentBidder, () => props.canBid, () => props.thinking, () => biddingHistory.value.length],
+  [
+    currentBidder,
+    () => props.canBid,
+    () => props.thinking,
+    () => biddingHistory.value.length,
+    recommendation,
+  ],
   () => {
-    selectedCall.value = null;
+    selectedCall.value = isHumanTurn.value ? recommendation.value?.call ?? null : null;
     alertText.value = '';
   },
+  { immediate: true },
 );
 
 /** 是否应禁用某按钮：AI 思考中 / 非人类回合 / 叫品不合法 */
@@ -80,6 +134,15 @@ function sameCall(a: BidCall, b: BidCall): boolean {
 
 function isSelected(call: BidCall): boolean {
   return selectedCall.value !== null && sameCall(selectedCall.value, call);
+}
+
+function isRecommended(call: BidCall): boolean {
+  return recommendation.value !== null && sameCall(recommendation.value.call, call);
+}
+
+/** 叫牌卡悬停解释：优先使用规则库，缺失时给通用说明 */
+function hintFor(call: BidCall): string {
+  return hints.value[callToString(call)] ?? '';
 }
 
 function selectBid(level: number, suit: BidSuit): void {
@@ -210,6 +273,17 @@ onBeforeUnmount(stopDrag);
     </div>
 
     <div class="bidding-card">
+      <div
+        v-if="recommendation"
+        class="bid-recommend"
+        :title="recommendation.description"
+        data-testid="bid-recommendation"
+      >
+        <span class="bid-recommend-tag">推荐</span>
+        <strong class="bid-recommend-call">{{ callLabel(recommendation.call) }}</strong>
+        <span class="bid-recommend-desc">{{ recommendation.description }}</span>
+      </div>
+
       <div class="bid-grid">
         <div v-for="level in LEVELS" :key="level" class="level-row">
           <button
@@ -221,9 +295,11 @@ onBeforeUnmount(stopDrag);
               red: RED_SUITS.has(suit),
               nt: suit === 'NT',
               selected: isSelected({ type: 'bid', level, suit }),
+              recommended: isRecommended({ type: 'bid', level, suit }),
             }"
             :data-level="level"
             :data-suit="suit"
+            :title="hintFor({ type: 'bid', level, suit })"
             :disabled="isDisabled({ type: 'bid', level, suit })"
             @click="selectBid(level, suit)"
             @dblclick="bidImmediately(level, suit)"
@@ -256,7 +332,11 @@ onBeforeUnmount(stopDrag);
         <button
           type="button"
           class="special-btn x"
-          :class="{ selected: isSelected({ type: 'double' }) }"
+          :class="{
+            selected: isSelected({ type: 'double' }),
+            recommended: isRecommended({ type: 'double' }),
+          }"
+          :title="hintFor({ type: 'double' })"
           :disabled="isDisabled({ type: 'double' })"
           @click="selectSimple('double')"
           @dblclick="specialImmediately('double')"
@@ -264,7 +344,11 @@ onBeforeUnmount(stopDrag);
         <button
           type="button"
           class="special-btn xx"
-          :class="{ selected: isSelected({ type: 'redouble' }) }"
+          :class="{
+            selected: isSelected({ type: 'redouble' }),
+            recommended: isRecommended({ type: 'redouble' }),
+          }"
+          :title="hintFor({ type: 'redouble' })"
           :disabled="isDisabled({ type: 'redouble' })"
           @click="selectSimple('redouble')"
           @dblclick="specialImmediately('redouble')"
@@ -272,7 +356,11 @@ onBeforeUnmount(stopDrag);
         <button
           type="button"
           class="special-btn pass"
-          :class="{ selected: isSelected({ type: 'pass' }) }"
+          :class="{
+            selected: isSelected({ type: 'pass' }),
+            recommended: isRecommended({ type: 'pass' }),
+          }"
+          :title="hintFor({ type: 'pass' })"
           :disabled="isDisabled({ type: 'pass' })"
           @click="selectSimple('pass')"
           @dblclick="specialImmediately('pass')"
@@ -338,6 +426,40 @@ onBeforeUnmount(stopDrag);
   padding: 4px 0 0;
   color: #000;
 }
+/* 自动推荐：显示推荐叫品与规则说明（不自动提交） */
+.bid-recommend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  margin: 0 0 4px;
+  padding: 2px 4px;
+  border: 1px solid #c9a227;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fffbe0, #fff2a8);
+  font-size: 10px;
+  line-height: 1.3;
+}
+.bid-recommend-tag {
+  flex: none;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: #b8860b;
+  color: #fffbe0;
+  font-weight: 700;
+}
+.bid-recommend-call {
+  flex: none;
+  color: #8a5a00;
+  font-size: 12px;
+}
+.bid-recommend-desc {
+  min-width: 0;
+  overflow: hidden;
+  color: #6a5320;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .bid-grid {
   display: flex;
   flex-direction: column;
@@ -376,6 +498,12 @@ onBeforeUnmount(stopDrag);
   background: #fff36b;
   box-shadow:
     inset 0 0 0 2px #111,
+    inset 1px 1px 0 rgba(255, 255, 255, 0.7);
+}
+.bid-btn.recommended:not(.selected):not(:disabled) {
+  background: #fff9bf;
+  box-shadow:
+    inset 0 0 0 2px #d4a017,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
 .bid-btn:disabled {
@@ -456,6 +584,12 @@ onBeforeUnmount(stopDrag);
   background: #fff36b;
   box-shadow:
     inset 0 0 0 2px #111,
+    inset 1px 1px 0 rgba(255, 255, 255, 0.7);
+}
+.special-btn.recommended:not(.selected):not(:disabled) {
+  background: #fff9bf;
+  box-shadow:
+    inset 0 0 0 2px #d4a017,
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
 .special-btn:disabled {

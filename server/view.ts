@@ -101,12 +101,19 @@ export function projectRoomView(
   const name = seat && room.seats[seat].kind === 'human'
     ? room.seats[seat].name
     : '';
+  const reclaimableSeat = ORDER.find((pos) => room.takeovers[pos]?.playerId === playerId) ?? null;
+  const takeoverName = reclaimableSeat ? room.takeovers[reclaimableSeat]?.name ?? '' : '';
 
   return {
     code: room.code,
     status: room.status,
     hostId: room.hostId,
-    you: { playerId, name, seat },
+    you: {
+      playerId,
+      name: name || takeoverName,
+      seat,
+      ...(reclaimableSeat ? { reclaimableSeat } : {}),
+    },
     config: configOf(room),
     seats,
     board: room.match ? projectBoardView(room.match, playerId) : null,
