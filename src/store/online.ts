@@ -166,6 +166,11 @@ export const useOnlineStore = defineStore('online', {
       onlineSocket.send({ v: PROTOCOL_VERSION, t: 'startMatch' });
     },
 
+    /** 房主结束当前比赛并回到大厅，便于重新配置后开始新牌局 */
+    endMatch(): void {
+      onlineSocket.send({ v: PROTOCOL_VERSION, t: 'endMatch' });
+    },
+
     submitBid(call: BidCall, alert?: { text: string }): void {
       onlineSocket.send({ v: PROTOCOL_VERSION, t: 'bid', call, ...(alert ? { alert } : {}) });
     },

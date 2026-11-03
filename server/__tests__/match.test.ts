@@ -236,6 +236,33 @@ describe('出牌校验与明手控制', () => {
     expect(engine.board!.currentTrick).toHaveLength(2);
   });
 
+  it('明手为真人、庄家为机器人时，明手接管庄家并控制两手出牌', () => {
+    const engine = toPlay();
+    engine.seats.N = { kind: 'bot', name: '机器人N', persona: { ...BOT, id: 'bot-N' } };
+
+    // 首攻由东家（真人）完成，之后轮到明手 S
+    engine.submitPlay('p-E', engine.board!.hands.E[0]);
+    expect(engine.controllerOf('S')).toBe('S');
+    expect(engine.controllerOf('N')).toBe('S');
+    expect(engine.canPlayerAct('p-S')).toBe(true);
+    expect(engine.canPlayerAct('p-N')).toBe(false);
+    expect(engine.pendingBotSeat()).toBeNull();
+
+    engine.submitPlay('p-S', engine.legalCardsFor('S')[0]);
+    expect(engine.board!.nextPlayer).toBe('W');
+    engine.submitPlay('p-W', engine.legalCardsFor('W')[0]);
+
+    // 轮到机器人庄家 N，仍由明手 S 控制，而不是交给 AI 自动出牌
+    expect(engine.board!.nextPlayer).toBe('N');
+    expect(engine.controllerOf('N')).toBe('S');
+    expect(engine.pendingBotSeat()).toBeNull();
+    expect(engine.canPlayerAct('p-S')).toBe(true);
+    engine.submitPlay('p-S', engine.legalCardsFor('N')[0]);
+    // 第四家出牌后本墩结算，进入已完成的墩
+    expect(engine.board!.currentTrick).toHaveLength(0);
+    expect(engine.board!.tricks).toHaveLength(1);
+  });
+
   it('全机器人可完整跑完一副：13 墩、结算与记录齐全', () => {
     const engine = createEngine({ seats: botSeats(), scoring: 'hcp-points' });
     engine.startBoard(1, { hands: fixedHands() });

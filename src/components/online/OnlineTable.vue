@@ -139,11 +139,20 @@ function isDummySeat(pos: Position): boolean {
   return board.value?.dummySeat === pos;
 }
 
-/** 该座位当前可见的牌：自己 / 明手（已摊牌）；结算后不在桌面展示暗牌 */
+/** 该座位当前可见的牌：自己 / 明手（已摊牌）/ 明手视角下同伴（庄家）的手牌 */
 function visibleCards(pos: Position): number[] | null {
   const b = board.value;
   if (!b || b.phase === 'scored') return null;
   if (b.yourSeat === pos && b.yourHand) return b.yourHand;
+  // 本人是明手时，同伴即庄家；服务端仅在此时下发 partnerHand
+  if (
+    b.yourSeat !== null &&
+    b.yourSeat === b.dummySeat &&
+    b.contract?.declarer === pos &&
+    b.partnerHand
+  ) {
+    return b.partnerHand;
+  }
   if (b.dummySeat === pos && b.dummyOpen && b.dummyHand) return b.dummyHand;
   return null;
 }
@@ -344,6 +353,14 @@ const recommendedCard = computed<number | null>(() => {
   let hand: number[] | null = null;
   if (acting === b.yourSeat) hand = b.yourHand;
   else if (acting === b.dummySeat && b.dummyOpen) hand = b.dummyHand;
+  else if (
+    b.yourSeat !== null &&
+    b.yourSeat === b.dummySeat &&
+    b.contract?.declarer === acting &&
+    b.partnerHand
+  ) {
+    hand = b.partnerHand;
+  }
   if (!hand || hand.length === 0) return null;
   return recommendPlay({
     hand,

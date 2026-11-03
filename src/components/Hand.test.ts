@@ -98,6 +98,31 @@ describe('Hand 牌面布局', () => {
     expect(wrapper.find('.hint-veil').exists()).toBe(false);
   });
 
+  it('推荐箭头按显示方位贴在中央侧：上家在下、下家在上、左右家朝向中央', () => {
+    const cards = parseHand('SA H2');
+    const cases: Array<['north' | 'south' | 'west' | 'east', string]> = [
+      ['north', 'N'],
+      ['south', 'S'],
+      ['west', 'W'],
+      ['east', 'E'],
+    ];
+
+    for (const [displaySlot, position] of cases) {
+      const wrapper = mount(Hand, {
+        props: {
+          cards,
+          position: 'E',
+          displaySlot,
+          clickable: true,
+          recommendedCard: cards[0],
+        },
+      });
+      const arrow = wrapper.get('.turn-arrow.variant-card');
+      expect(arrow.classes()).toContain(`pos-${position}`);
+      expect(arrow.attributes('aria-label')).toBe('推荐出牌');
+    }
+  });
+
   it('相对视角下转向箭头使用显示方位而不是真实座位', () => {
     const wrapper = mount(Hand, {
       props: {

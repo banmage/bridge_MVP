@@ -307,6 +307,14 @@ export class GameHub {
         this.afterAction(room);
         return;
       }
+      case 'endMatch': {
+        const room = this.requireRoom(client);
+        this.rooms.endMatch(client.playerId, room.code);
+        this.cancelAi(room.code);
+        deleteRoomSnapshot(room.code);
+        this.broadcast(room);
+        return;
+      }
       case 'bid': {
         const room = this.requireRoom(client);
         this.rooms.submitBid(client.playerId, room.code, msg.call, msg.alert);
@@ -409,6 +417,13 @@ export class GameHub {
     } catch {
       // 快照失败不阻断对局；下一次动作会重试
     }
+  }
+
+  private cancelAi(code: string): void {
+    const timer = this.aiTimers.get(code);
+    if (timer === undefined) return;
+    this.clearTimer(timer);
+    this.aiTimers.delete(code);
   }
 
   private scheduleAi(room: Room): void {

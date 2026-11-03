@@ -78,16 +78,46 @@ withDefaults(
   margin-top: -15px;
   transform: rotate(90deg);
 }
-/* 推荐出牌：固定在单张牌上方，向下指向该牌，覆盖座位方向定位 */
+/* 推荐出牌：贴在牌的中央侧，指向这张牌，覆盖座位方向定位。
+   --card-visible-width 由 Hand 的 .card-slot 提供：叠放后真正露出的牌宽，
+   保证箭头对准可见牌面而不是整个定位槽（最后一张牌为完整牌宽）。 */
 .turn-arrow.variant-card {
-  top: auto;
-  right: auto;
-  bottom: calc(100% + 1px);
-  left: 50%;
   width: 22px;
   height: 22px;
-  margin: 0 0 0 -11px;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin: 0;
+  transform: none;
+}
+/* 上方座位（明手/同伴）：牌的下方，箭头朝上，位于中央区域 */
+.turn-arrow.variant-card.pos-N {
+  top: calc(100% + 1px);
+  left: calc(var(--card-visible-width, 100%) / 2);
+  margin-left: -11px;
+  transform: rotate(0deg);
+}
+/* 下方座位（自己）：牌的上方，箭头朝下 */
+.turn-arrow.variant-card.pos-S {
+  bottom: calc(100% + 1px);
+  left: calc(var(--card-visible-width, 100%) / 2);
+  margin-left: -11px;
   transform: rotate(180deg);
+}
+/* 左侧座位：牌的右方（中央侧），箭头朝左 */
+.turn-arrow.variant-card.pos-W {
+  top: 50%;
+  left: calc(var(--card-visible-width, 100%) + 1px);
+  margin-top: -11px;
+  transform: rotate(-90deg);
+}
+/* 右侧座位：牌的左方（中央侧），箭头朝右 */
+.turn-arrow.variant-card.pos-E {
+  top: 50%;
+  right: calc(100% + 1px);
+  margin-top: -11px;
+  transform: rotate(90deg);
 }
 @keyframes turn-arrow-blink {
   0%,

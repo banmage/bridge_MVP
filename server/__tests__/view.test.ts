@@ -91,6 +91,7 @@ describe('视角投影：叫牌阶段', () => {
       expect(board.yourSeat).toBe(pos);
       expect(board.yourHand).toEqual(hands[pos]);
       expect(board.dummyHand).toBeNull();
+      expect(board.partnerHand).toBeNull();
       expect(board.revealedHands).toBeNull();
       expect(board.scoring).toBeNull();
       const text = JSON.stringify(board);
@@ -125,6 +126,7 @@ describe('视角投影：打牌与明手', () => {
       expect(board.dummySeat).toBe('S');
       expect(board.dummyOpen).toBe(false);
       expect(board.dummyHand).toBeNull();
+      expect(board.partnerHand).toBeNull();
     }
 
     engine.submitPlay('p-E', engine.board!.hands.E[0]);
@@ -133,6 +135,8 @@ describe('视角投影：打牌与明手', () => {
       expect(board.dummyOpen).toBe(true);
       expect(board.dummyHand).toEqual(hands.S);
       expect(board.revealedHands).toBeNull();
+      // 只有明手本人能看到同伴（庄家 N）的手牌
+      expect(board.partnerHand).toEqual(pos === 'S' ? hands.N : null);
     }
   });
 
@@ -167,6 +171,7 @@ describe('视角投影：打牌与明手', () => {
       expect(board.score).not.toBeNull();
       expect(board.scoring).not.toBeNull();
       expect(board.dummyHand).toBeNull();
+      expect(board.partnerHand).toBeNull();
       expect(board.yourHand).toBeNull();
       expect(board.revealedHands).not.toBeNull();
       for (const p of POSITIONS) expect(board.revealedHands![p]).toHaveLength(13);

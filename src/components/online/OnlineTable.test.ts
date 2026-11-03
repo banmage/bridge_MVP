@@ -22,6 +22,7 @@ function makeBoard(overrides: Partial<BoardView> = {}): BoardView {
     yourHand: parseHand('SA SK HQ DJ C9'),
     dummySeat: null,
     dummyHand: null,
+    partnerHand: null,
     dummyOpen: false,
     revealedHands: null,
     score: null,
@@ -266,6 +267,58 @@ describe('OnlineTable 联网牌桌布局', () => {
     const idle = mountTable({ ...board, canAct: false, actingForSeat: null });
     await idle.vm.$nextTick();
     expect(idle.find('.turn-arrow.variant-card').exists()).toBe(false);
+  });
+
+  it('明手视角显示同伴（庄家）手牌，并可代庄家出牌', async () => {
+    const board = makeBoard({
+      phase: 'play',
+      yourSeat: 'S',
+      yourHand: parseHand('SA H2'),
+      dummySeat: 'S',
+      dummyHand: parseHand('SA H2'),
+      partnerHand: parseHand('SK HQ'),
+      dummyOpen: true,
+      nextPlayer: 'N',
+      canAct: true,
+      actingForSeat: 'N',
+      contract: { level: 1, suit: 'NT', doubled: false, redoubled: false, declarer: 'N', dummy: 'S' },
+    });
+    const wrapper = mountTable(board);
+    await wrapper.vm.$nextTick();
+
+    // 自己（明手）与同伴（庄家）的牌都摊开
+    expect(wrapper.find('.hand.pos-S .suits').exists()).toBe(true);
+    expect(wrapper.find('.hand.pos-N .suits').exists()).toBe(true);
+    expect(wrapper.find('.hand.pos-N .cards.backs').exists()).toBe(false);
+    // 推荐牌基于同伴（庄家）的手牌计算
+    expect(wrapper.find('.hand.pos-N .turn-arrow.variant-card').exists()).toBe(true);
+
+    // 明手自动接管庄家后，可以直接点击庄家的牌出牌
+    const card = wrapper.get('.hand.pos-N .playing-card[data-suit="♠"]');
+    await card.trigger('dblclick');
+    expect(wrapper.emitted('play')?.[0]).toEqual([parseHand('SK')[0]]);
+  });
+
+  it('非明手视角不会因 partnerHand 字段泄露庄家手牌', () => {
+    const wrapper = mountTable(
+      makeBoard({
+        phase: 'play',
+        yourSeat: 'E',
+        yourHand: parseHand('SA H2'),
+        dummySeat: 'S',
+        dummyHand: parseHand('S3 H4'),
+        partnerHand: parseHand('SK HQ'),
+        dummyOpen: true,
+        nextPlayer: 'N',
+        contract: { level: 1, suit: 'NT', doubled: false, redoubled: false, declarer: 'N', dummy: 'S' },
+      }),
+    );
+
+    // 东家视角：北家在右侧，庄家 N 仍应显示牌背
+    expect(wrapper.find('.seat.east .hand.pos-N .cards.backs').exists()).toBe(true);
+    expect(wrapper.find('.seat.east .hand.pos-N .suits').exists()).toBe(false);
+    // 明手 S 在左侧，仍然公开
+    expect(wrapper.find('.seat.west .hand.pos-S .suits').exists()).toBe(true);
   });
 
   it('按观看者座位旋转牌桌：自己在下、同伴在上，出牌区同步旋转', async () => {

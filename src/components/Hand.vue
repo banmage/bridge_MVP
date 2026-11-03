@@ -163,6 +163,12 @@ function clearHint(): void {
   display: flex;
   flex: none;
   align-items: flex-end;
+  /* 叠放后真正露出的牌宽（最后一张牌会覆盖为完整牌宽） */
+  --card-visible-width: calc(100% + var(--card-overlap));
+}
+/* 最后一张牌右侧没有其他牌遮挡，箭头对准完整牌面中心 */
+.suit-group:last-child .card-slot:last-child {
+  --card-visible-width: 100%;
 }
 /* 同花色与跨花色均使用完全相同的叠放距离 */
 .suit-group + .suit-group,

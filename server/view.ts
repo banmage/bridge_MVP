@@ -18,8 +18,9 @@ import type { Room } from './room';
  * 不变量：
  * 1. yourHand 仅包含自己的手牌；
  * 2. dummyHand 仅在明手已摊牌时存在；
- * 3. revealedHands 仅在本副结算后存在；
- * 4. BoardView 不含 seed。
+ * 3. partnerHand 仅在观看者本人是明手且明手已摊牌时存在（庄家的牌）；
+ * 4. revealedHands 仅在本副结算后存在；
+ * 5. BoardView 不含 seed。
  */
 
 const EMPTY_RESULT: MatchResult = {
@@ -53,6 +54,7 @@ export function projectBoardView(engine: MatchEngine, playerId: string): BoardVi
   const contract = board.contract;
   const phase = board.phase;
   const scored = phase === 'scored';
+  const viewerIsDummy = !!contract && yourSeat === contract.dummy;
 
   return {
     index: board.index,
@@ -76,6 +78,10 @@ export function projectBoardView(engine: MatchEngine, playerId: string): BoardVi
     yourHand: yourSeat && !scored ? [...board.hands[yourSeat]] : null,
     dummySeat: contract ? contract.dummy : null,
     dummyHand: contract && board.dummyOpen && !scored ? [...board.hands[contract.dummy]] : null,
+    partnerHand:
+      contract && viewerIsDummy && board.dummyOpen && !scored
+        ? [...board.hands[contract.declarer]]
+        : null,
     dummyOpen: board.dummyOpen,
     revealedHands: scored
       ? (Object.fromEntries(

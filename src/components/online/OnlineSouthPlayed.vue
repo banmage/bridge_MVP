@@ -109,6 +109,14 @@ function exposedCards(pos: Position): number[] {
   if (!b) return [];
   if (b.revealedHands) return b.revealedHands[pos] ?? [];
   if (b.yourSeat === pos && b.yourHand) return b.yourHand;
+  if (
+    b.yourSeat !== null &&
+    b.yourSeat === b.dummySeat &&
+    b.contract?.declarer === pos &&
+    b.partnerHand
+  ) {
+    return b.partnerHand;
+  }
   if (b.dummySeat === pos && b.dummyOpen && b.dummyHand) return b.dummyHand;
   return [];
 }
@@ -118,6 +126,14 @@ function handKnown(pos: Position): boolean {
   if (!b) return false;
   if (b.revealedHands) return true;
   if (b.yourSeat === pos && b.yourHand) return true;
+  if (
+    b.yourSeat !== null &&
+    b.yourSeat === b.dummySeat &&
+    b.contract?.declarer === pos &&
+    b.partnerHand
+  ) {
+    return true;
+  }
   if (b.dummySeat === pos && b.dummyOpen && b.dummyHand) return true;
   return false;
 }
@@ -232,7 +248,9 @@ const declarerTricksWon = computed(() => {
           </div>
         </template>
       </div>
-      <p class="expose-tip">联网对局只展示自己的手牌、已摊开的明手，以及本副结算后的四手牌。</p>
+      <p class="expose-tip">
+        联网对局只展示自己的手牌、已摊开的明手；明手视角还可看到同伴（庄家）的手牌，本副结算后公开四手牌。
+      </p>
     </ElDialog>
 
     <ElDialog v-model="contractVisible" title="定约卡" width="360px" append-to-body>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { ElMessageBox } from 'element-plus';
 import {
   normalizeBiddingSystems,
   type BidCall,
@@ -123,7 +124,10 @@ const turnHint = computed(() => {
   if (board.value?.canAct) {
     if (board.value.phase === 'bidding') return '轮到你叫牌 · 请使用叫牌卡';
     if (board.value.phase === 'play' || board.value.phase === 'play_waiting_lead') {
-      return '轮到你出牌 · 左键选中，右键或双击确认';
+      const forPartner = board.value.actingForSeat !== board.value.yourSeat;
+      return forPartner
+        ? '轮到你替同伴出牌 · 左键选中，右键或双击确认'
+        : '轮到你出牌 · 左键选中，右键或双击确认';
     }
   }
   return statusText.value;
@@ -227,6 +231,25 @@ function onChatSend(text: string): void {
 function onToggleAutoPlay(): void {
   store.setAutoPlay(!autoPlaying.value);
 }
+
+/** 房主结束当前比赛：确认后回到大厅，可重新配置并开赛 */
+async function onEndMatch(): Promise<void> {
+  if (!store.isHost) return;
+  try {
+    await ElMessageBox.confirm(
+      '结束后本场进行中的对局将不再保留，房间会回到大厅；可重新配置座位并开始新的牌局。确定结束吗？',
+      '结束比赛',
+      {
+        confirmButtonText: '结束比赛',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+  store.endMatch();
+}
 </script>
 
 <template>
@@ -252,6 +275,14 @@ function onToggleAutoPlay(): void {
       <span class="connection" :class="store.connection">{{ connectionText }}</span>
       <el-button :disabled="!room" @click="openScore">成绩</el-button>
       <el-button v-if="canNextBoard" type="primary" @click="store.nextBoard()">下一副</el-button>
+      <el-button
+        v-if="store.isHost && room && room.status !== 'lobby'"
+        type="danger"
+        plain
+        @click="onEndMatch"
+      >
+        结束比赛
+      </el-button>
       <el-button :disabled="!room" @click="store.requestState()">刷新</el-button>
       <el-button :disabled="!room" @click="copyCode">邀请</el-button>
       <el-button type="danger" text @click="leave">离开</el-button>

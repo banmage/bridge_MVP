@@ -131,6 +131,11 @@ export interface BoardView {
   yourHand: number[] | null;
   dummySeat: Position | null;
   dummyHand: number[] | null;
+  /**
+   * 同伴手牌：仅当观看者本人是明手、且明手已摊牌时下发，
+   * 用于明手视角查看庄家（同伴）的牌；其他座位始终为 null。
+   */
+  partnerHand: number[] | null;
   dummyOpen: boolean;
   revealedHands: Record<Position, number[]> | null;
   score: { NS: number; EW: number } | null;
@@ -224,6 +229,7 @@ export type ClientMessage =
   | { v: number; t: 'setConfig'; config: RoomConfigInput }
   | { v: number; t: 'setAutoPlay'; enabled: boolean }
   | { v: number; t: 'startMatch' }
+  | { v: number; t: 'endMatch' }
   | { v: number; t: 'bid'; call: BidCall; alert?: { text: string } }
   | { v: number; t: 'play'; card: number }
   | { v: number; t: 'nextBoard' }

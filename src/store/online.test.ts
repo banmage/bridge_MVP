@@ -98,6 +98,7 @@ function scoredBoard(): BoardView {
     yourHand: null,
     dummySeat: null,
     dummyHand: null,
+    partnerHand: null,
     dummyOpen: false,
     revealedHands: { N: hand(0), E: hand(13), S: hand(26), W: hand(39) },
     score: { NS: 0, EW: 0 },

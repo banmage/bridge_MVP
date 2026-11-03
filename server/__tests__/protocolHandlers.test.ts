@@ -163,6 +163,61 @@ describe('房间与开赛', () => {
     expect(after.bidding[0].position).toBe('N');
   });
 
+  it('房主结束比赛后回到大厅，可重新开赛', () => {
+    const { hub } = setup();
+    const a = connect(hub, 'p-1', 'Alice');
+    const b = connect(hub, 'p-2', 'Bob');
+
+    hub.receive('p-1', {
+      v: 1,
+      t: 'createRoom',
+      config: { boards: 12, scoring: 'mp' },
+      seat: 'S',
+    });
+    hub.receive('p-2', { v: 1, t: 'joinRoom', code: 'ROOM01', seat: 'E' });
+    for (const seat of ['N', 'W'] as const) {
+      hub.receive('p-1', {
+        v: 1,
+        t: 'setSeat',
+        seat,
+        occupant: {
+          kind: 'bot',
+          persona: {
+            id: `bot-${seat}`,
+            name: `${seat}机器人`,
+            risk: 'normal',
+            system: 'precision',
+            conventions: [],
+            randomness: 0,
+          },
+        },
+      });
+    }
+
+    hub.receive('p-1', { v: 1, t: 'startMatch' });
+    expect(roomView(a).status).toBe('playing');
+    expect(hub.hasAiTimer('ROOM01')).toBe(true);
+
+    // 非房主不能结束比赛
+    hub.receive('p-2', { v: 1, t: 'endMatch' });
+    expect(b.lastOfType('error')?.code).toBe('NOT_HOST');
+    expect(roomView(a).status).toBe('playing');
+
+    // 房主结束后回到大厅，AI 计时器被取消，座位与配置保留
+    hub.receive('p-1', { v: 1, t: 'endMatch' });
+    const ended = roomView(a);
+    expect(ended.status).toBe('lobby');
+    expect(ended.board).toBeNull();
+    expect(ended.seats.E.kind).toBe('human');
+    expect(ended.config.boards).toBe(12);
+    expect(hub.hasAiTimer('ROOM01')).toBe(false);
+
+    // 可重新开赛
+    hub.receive('p-1', { v: 1, t: 'startMatch' });
+    expect(roomView(a).status).toBe('playing');
+    expect(roomView(a).board?.index).toBe(1);
+  });
+
   it('主动托管广播本人状态，解除后恢复手动', () => {
     const { hub } = setup();
     const a = connect(hub, 'p-1', 'Alice');

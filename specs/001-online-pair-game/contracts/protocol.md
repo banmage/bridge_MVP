@@ -35,9 +35,10 @@
 | `updateBot` | `seat, persona` | 房主修改机器人人格（lobby）；体系按方同步 |
 | `setConfig` | `config:{boards,scoring,systems?}` | 房主修改配置（lobby）；`systems` 为 `{NS,EW}` |
 | `setAutoPlay` | `enabled:boolean` | 主动托管/解除自己的真人座位（仅对局中） |
-| `startMatch` | — | 房主开赛（要求 4 座占满） |
+| `startMatch` | — | 房主开赛（要求 4 座占满；每次开赛生成新的比赛 ID 与发牌种子） |
+| `endMatch` | — | 房主结束当前比赛并回到大厅（保留座位与配置，便于重新开赛） |
 | `bid` | `call:BidCall, alert?:{text}` | 提交叫牌（仅自己座位） |
-| `play` | `card:number` | 提交出牌（庄家可代打明手） |
+| `play` | `card:number` | 提交出牌（庄家可代打明手；庄家为 AI、明手为真人时由明手接管两手） |
 | `nextBoard` | — | 房主/任一真人提前开始下一副（结算后 10s 自动开始） |
 | `chat` | `text` | 房间聊天（≤200 字符） |
 | `requestState` | — | 请求重发当前快照 |
@@ -104,11 +105,13 @@
 
 - 托管只改变控制权，座位仍是真人，手牌可见性不变；再次发送 `enabled:false` 即解除。
 - 唯一合法出牌由服务端自动打出，不经过 `play` 报文，真人无需等待点击。
+- 观看者为明手且明手已摊牌时，`partnerHand` 下发庄家（同伴）手牌；其他座位始终为 `null`。
+- 明手为真人、庄家为 AI 机器人时，明手自动接管庄家，可同时操作两手出牌；`actingForSeat` 指向当前实际要出牌的座位。
 
 ### 4.5 快照中的牌桌
 
 ```json
-{ "v":1, "t":"room", "room":{ ..., "board":{ "index":1, "dealer":"N", "vulnerability":"none", "phase":"play", "currentBidder":"W", "nextPlayer":"E", "contract":{"level":3,"suit":"NT","doubled":false,"redoubled":false,"declarer":"S","dummy":"N"}, "bidding":[...], "tricks":[...], "currentTrick":[{"position":"S","card":51}], "yourSeat":"S", "yourHand":[12,25,...], "dummySeat":"N", "dummyHand":[3,7,...], "dummyOpen":true, "revealedHands":null, "canAct":false, "actingForSeat":null, "message":"E 出牌" } } }
+{ "v":1, "t":"room", "room":{ ..., "board":{ "index":1, "dealer":"N", "vulnerability":"none", "phase":"play", "currentBidder":"W", "nextPlayer":"E", "contract":{"level":3,"suit":"NT","doubled":false,"redoubled":false,"declarer":"S","dummy":"N"}, "bidding":[...], "tricks":[...], "currentTrick":[{"position":"S","card":51}], "yourSeat":"S", "yourHand":[12,25,...], "dummySeat":"N", "dummyHand":[3,7,...], "partnerHand":null, "dummyOpen":true, "revealedHands":null, "canAct":false, "actingForSeat":null, "message":"E 出牌" } } }
 ```
 
 ## 5. 兼容与演进

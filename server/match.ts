@@ -381,10 +381,20 @@ export class MatchEngine {
     this.applyPlay(seat, card);
   }
 
-  /** 该座位由谁控制：明手由庄家代打，其余由本座占用者控制 */
+  /**
+   * 该座位由谁控制：
+   * - 明手由庄家代打；
+   * - 若庄家是机器人、明手是真人，则明手自动接管庄家，控制两方出牌
+   *   （联网时人类为明手、同伴为 AI 的常见场景）。
+   */
   controllerOf(seat: Position): Position {
     const board = this.board;
-    if (board?.contract && board.contract.dummy === seat) return board.contract.declarer;
+    if (!board?.contract) return seat;
+    const { declarer, dummy } = board.contract;
+    const dummyTakesOver =
+      this.seats[dummy].kind === 'human' && this.seats[declarer].kind === 'bot';
+    if (dummyTakesOver && (seat === declarer || seat === dummy)) return dummy;
+    if (seat === dummy) return declarer;
     return seat;
   }
 

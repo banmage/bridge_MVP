@@ -443,9 +443,13 @@ export class RoomManager {
       }
     }
 
-    // 开赛前再同步一次：保证同方同伴体系一致，旧配置也补上默认精确体系
+    // 开赛前再同步一次：保证同方同伴体系一致，旧配置也补上默认精确体系。
+    // 每次开赛生成新的比赛 ID；正式房间同时换新种子，避免重开时复现同一副牌。
+    const now = this.now();
     room.config = {
       ...room.config,
+      matchId: `m_${now.toString(36)}_${room.code.toLowerCase()}_${Math.random().toString(36).slice(2, 8)}`,
+      seedBase: this.seedBase ?? randomSeed(),
       systems: normalizeBiddingSystems(room.config.systems, DEFAULT_BIDDING_SYSTEMS),
     };
     this.syncSystems(room);
@@ -469,6 +473,39 @@ export class RoomManager {
     room.status = 'playing';
     room.nextBoardAt = null;
     room.match.start();
+    room.updatedAt = this.now();
+    return room;
+  }
+
+  /**
+   * 房主提前结束当前比赛并回到大厅：保留座位与配置，便于重新开赛。
+   * 断线超时托管产生的机器人座位会还原为原真人（离线），
+   * 原玩家仍可用同一身份收回；房主也可在座位面板重新设为机器人或空位。
+   */
+  endMatch(playerId: string, code: string): Room {
+    const room = this.getRoom(code);
+    this.assertHost(room, playerId);
+    if (room.status === 'lobby') {
+      throw new MatchError('WRONG_PHASE', '比赛尚未开始');
+    }
+
+    for (const pos of POSITIONS) {
+      const takeover = room.takeovers[pos];
+      if (!takeover || room.seats[pos].kind !== 'bot') continue;
+      room.seats[pos] = {
+        kind: 'human',
+        playerId: takeover.playerId,
+        name: takeover.name,
+        connected: false,
+      };
+      if (!room.joinOrder.includes(takeover.playerId)) room.joinOrder.push(takeover.playerId);
+    }
+
+    room.takeovers = {};
+    room.autoPlay = {};
+    room.match = null;
+    room.status = 'lobby';
+    room.nextBoardAt = null;
     room.updatedAt = this.now();
     return room;
   }

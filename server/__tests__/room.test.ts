@@ -316,6 +316,32 @@ describe('座位配置与开赛校验', () => {
     expect(room.match!.board!.index).toBe(1);
   });
 
+  it('房主结束比赛后回到大厅，可重新开赛', () => {
+    const { m, room } = newRoom();
+    expect(() => m.endMatch('p-host', 'ABC123')).toThrow(/尚未开始/);
+
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+    const firstMatch = room.match;
+    expect(room.status).toBe('playing');
+
+    // 非房主不能结束比赛
+    expect(() => m.endMatch('p-2', 'ABC123')).toThrow(/房主/);
+
+    m.endMatch('p-host', 'ABC123');
+    expect(room.status).toBe('lobby');
+    expect(room.match).toBeNull();
+    expect(room.nextBoardAt).toBeNull();
+    expect(room.autoPlay).toEqual({});
+    expect(room.seats.S.kind).toBe('human');
+
+    // 回到大厅后可以重新开赛，并生成新的比赛实例
+    m.startMatch('p-host', 'ABC123');
+    expect(room.status).toBe('playing');
+    expect(room.match).not.toBeNull();
+    expect(room.match).not.toBe(firstMatch);
+  });
+
   it('主动托管保留真人座位，解除后恢复手动', () => {
     const { m, room } = newRoom();
     fillWithBots(m);
