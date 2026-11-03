@@ -174,13 +174,12 @@ describe('Table 出牌显示', () => {
 
     // 推荐不再改变牌面样式，而是在对应牌张上方显示闪烁箭头
     expect(wrapper.find('.hand.pos-S .playing-card.recommended').exists()).toBe(false);
-    const arrow = wrapper.get('.hand.pos-S .play-hint-arrow');
-    expect(arrow.text()).toBe('▼');
+    const arrow = wrapper.get('.hand.pos-S .turn-arrow.variant-card');
     expect(arrow.attributes('aria-label')).toBe('推荐出牌');
 
     const slot = wrapper
       .findAll('.hand.pos-S .card-slot')
-      .find((item) => item.find('.play-hint-arrow').exists());
+      .find((item) => item.find('.turn-arrow.variant-card').exists());
     expect(slot).toBeTruthy();
     const recommended = slot!.get('.playing-card');
     // 西家首攻 ♠K，南家必须跟黑桃，推荐只能是 ♠A
@@ -685,9 +684,9 @@ describe('Table 当前出牌座位箭头', () => {
 
     store.nextPlayer = 'S';
     await nextTick();
-    // 轮到人类且存在推荐出牌时，用推荐箭头替代座位转向箭头，避免双箭头干扰
-    expect(wrapper.findAll('.turn-arrow')).toHaveLength(0);
-    expect(wrapper.find('.hand.pos-S .play-hint-arrow').exists()).toBe(true);
+    // 轮到人类且存在推荐出牌时，用牌上方的推荐箭头替代座位转向箭头，避免双箭头干扰
+    expect(wrapper.findAll('.turn-arrow')).toHaveLength(1);
+    expect(wrapper.find('.hand.pos-S .turn-arrow.variant-card').exists()).toBe(true);
     expect(wrapper.find('.hand.pos-E .turn-arrow').exists()).toBe(false);
   });
 

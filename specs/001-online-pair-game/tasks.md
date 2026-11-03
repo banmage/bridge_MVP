@@ -88,6 +88,16 @@
   主动离开放弃；`RoomView.you.reclaimableSeat` + 提示条「收回座位」
 - [x] T052 快照保存托管记录；文档同步（README、`docs/联网对战.md`、`docs/online-mvp/01..07`、spec FR-007/FR-029）
 
+## Phase 11: 体验修正（CR-009）
+
+- [x] T053 `TurnArrow` 增加 `variant="card"`：推荐出牌复用座位闪烁箭头，平移到推荐牌上方
+- [x] T054 `MatchEngine.pendingForcedSeat/runAutoStep`：唯一合法出牌自动打出，调度器仍等待
+  `PLAY_DISPLAY_MS`，真人/机器人统一路径
+- [x] T055 `ChatMessage.system` + `online.noteSystem`：错误、toast、房间解散提示写入聊天并标记系统消息
+- [x] T056 `Room.autoPlay` + `setAutoPlay` 协议 + 右下角「托管 / 解除托管」按钮，状态写入快照
+- [x] T057 `MatchConfig.systems` 按方统一体系并默认精确；同方机器人体系自动同步，客户端按方加载规则
+- [x] T058 放大叫牌卡/按钮字体与手牌，收紧中央空白；文档与验收记录同步
+
 ## 依赖关系
 
 - Phase 2 阻塞 Phase 3/5。
@@ -130,7 +140,14 @@
   - 文档同步：README、`docs/联网对战.md`、`docs/online-mvp/01..07`、quickstart、spec（FR-028）。
 - **T049–T052 布局/人类辅助/座位收回（CR-007 / CR-008，2026-11-02）**：
   - 联网牌桌与单人版统一布局；叫牌卡按规则库推荐并预选（不自动提交）、叫牌表悬停解释，
-    出牌时金色箭头标出推荐合法牌；辅助只读且只使用本人/已公开明手牌；
+    出牌时用与座位指示一致的闪烁箭头标出推荐合法牌；辅助只读且只使用本人/已公开明手牌；
   - 超时托管记录原身份并写入快照，原身份重连自动收回座位，主动离开放弃；牌桌提示条支持手动收回；
   - `npm test`：38 个测试文件、**392 tests passed**；`npm run typecheck`、`npm run typecheck:server`、
+    `npm run build` 全部通过。
+- **T053–T058 体验修正（CR-009，2026-11-03）**：
+  - 推荐出牌复用 `TurnArrow` 闪烁箭头并平移到推荐牌上方；唯一合法出牌由服务端自动打出，
+    仍等待上一张牌展示满 `PLAY_DISPLAY_MS`；
+  - 主动托管保留真人座位与手牌，可随时解除，状态写入房间/引擎快照；系统提示写入聊天并标记“系统”；
+  - 每方叫牌体系统一并默认精确，同方机器人自动同步，客户端按叫牌人所在方加载解释规则；
+  - `npm test`：39 个测试文件、**414 tests passed**；`npm run typecheck`、`npm run typecheck:server`、
     `npm run build` 全部通过。

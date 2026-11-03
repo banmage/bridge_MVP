@@ -221,6 +221,26 @@ describe('视角投影：房间与座位', () => {
     expect(reclaimed.seats.N.kind).toBe('human');
   });
 
+  it('主动托管只向本人暴露 you.autoPlay，解除后消失', () => {
+    const { room, manager } = fixture();
+    manager.setAutoPlay('p-N', 'ROOM01', true);
+
+    expect(projectRoomView(room, 'p-N').you.autoPlay).toBe(true);
+    // 其他玩家不会看到别人的托管状态
+    expect(projectRoomView(room, 'p-E').you.autoPlay).toBeUndefined();
+    expect(projectRoomView(room, 'p-N').seats.N.kind).toBe('human');
+
+    manager.setAutoPlay('p-N', 'ROOM01', false);
+    expect(projectRoomView(room, 'p-N').you.autoPlay).toBeUndefined();
+  });
+
+  it('旧房间配置缺少每方体系时补全默认精确', () => {
+    const { room } = fixture();
+    delete room.config.systems;
+    const view = projectRoomView(room, 'p-N');
+    expect(view.config.systems).toEqual({ NS: 'precision', EW: 'precision' });
+  });
+
   it('projectBoardView 在未开局时返回 null', () => {
     const manager = new RoomManager({ seedBase: 1, codes: ['ROOM02'] });
     const room = manager.createRoom({ playerId: 'p-N', name: '北家' }, { boards: 12, scoring: 'mp' }, 'N');

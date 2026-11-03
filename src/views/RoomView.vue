@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { BidCall, Position, RoomView } from '@shared/protocol';
+import {
+  normalizeBiddingSystems,
+  type BidCall,
+  type BiddingSystem,
+  type Position,
+  type RoomView,
+} from '@shared/protocol';
+import { getSide } from '../models/gameState';
+import type { BiddingRule } from '../engine/types';
 import { lastBidOf } from '../core/bidding/validator';
 import { loadBiddingRules } from '../engine/loader';
 import { useOnlineStore } from '../store/online';
@@ -20,8 +28,15 @@ const replayIndex = ref<number | null>(null);
 const scoreVisible = ref(false);
 const now = ref(Date.now());
 
-/** 联网牌桌的规则提示统一使用默认精确体系（服务端默认体系） */
-const biddingRules = loadBiddingRules();
+/** 规则资产按体系缓存，切换叫牌人所在方时无需重复解析 YAML */
+const ruleCache = new Map<BiddingSystem, BiddingRule[]>();
+function rulesFor(system: BiddingSystem): BiddingRule[] {
+  const cached = ruleCache.get(system);
+  if (cached) return cached;
+  const rules = loadBiddingRules(system);
+  ruleCache.set(system, rules);
+  return rules;
+}
 
 let clock: ReturnType<typeof setInterval> | null = null;
 let joinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -30,6 +45,22 @@ const room = computed<RoomView | null>(() => store.room);
 const isMine = computed(() => room.value?.code === props.code.toUpperCase());
 const board = computed(() => (isMine.value ? room.value?.board ?? null : null));
 const isLobby = computed(() => room.value?.status === 'lobby');
+/** 当前是否由 AI 托管自己的座位 */
+const autoPlaying = computed(() => !!room.value?.you.autoPlay);
+/** 服务端聊天与本地系统提示按时间合并 */
+const chatMessages = computed(() => store.chatMessages);
+
+/** 每方叫牌规则：双方体系可能不同，历史叫品按叫牌人所在方解释 */
+const biddingRulesBySide = computed<Partial<Record<'NS' | 'EW', BiddingRule[]>>>(() => {
+  const systems = normalizeBiddingSystems(room.value?.config.systems);
+  return { NS: rulesFor(systems.NS), EW: rulesFor(systems.EW) };
+});
+
+/** 按当前叫牌人所在方加载叫牌体系，保证叫牌卡提示与 AI 实际使用的体系一致 */
+const biddingRules = computed<BiddingRule[]>(() => {
+  const bidder = board.value?.currentBidder;
+  return biddingRulesBySide.value[bidder ? getSide(bidder) : 'NS'] ?? [];
+});
 
 const replayBoard = computed(() =>
   replayIndex.value === null ? null : store.records[replayIndex.value] ?? null,
@@ -86,6 +117,9 @@ const statusText = computed(() => {
 
 /** 叫牌 / 出牌提示：轮到本人时给出明确操作说明 */
 const turnHint = computed(() => {
+  if (autoPlaying.value && room.value?.status === 'playing') {
+    return '托管中 · AI 正在代你叫牌与出牌 · 可在右下角解除托管';
+  }
   if (board.value?.canAct) {
     if (board.value.phase === 'bidding') return '轮到你叫牌 · 请使用叫牌卡';
     if (board.value.phase === 'play' || board.value.phase === 'play_waiting_lead') {
@@ -188,6 +222,11 @@ function copyCode(): void {
 function onChatSend(text: string): void {
   store.chat(text);
 }
+
+/** 主动托管：座位与手牌保留，切换后由 AI 代叫/代打 */
+function onToggleAutoPlay(): void {
+  store.setAutoPlay(!autoPlaying.value);
+}
 </script>
 
 <template>
@@ -257,6 +296,15 @@ function onChatSend(text: string): void {
       <p>正在进入房间 {{ props.code.toUpperCase() }}…</p>
       <p v-if="store.error" class="hint">{{ store.error.message }}</p>
       <el-button v-if="store.error?.code === 'ROOM_NOT_FOUND'" @click="router.push('/')">返回大厅</el-button>
+      <!-- 房间不存在时牌桌不渲染，系统提示仍要能在聊天区看到 -->
+      <OnlineChat
+        v-if="chatMessages.length"
+        inline
+        readonly
+        title="系统消息"
+        :messages="chatMessages"
+        @send="onChatSend"
+      />
     </div>
 
     <template v-else>
@@ -275,9 +323,12 @@ function onChatSend(text: string): void {
           <OnlineTable
             :room="room"
             :bidding-rules="biddingRules"
+            :bidding-rules-by-side="biddingRulesBySide"
+            :messages="chatMessages"
             @play="onPlay"
             @score="openScore"
             @chat-send="onChatSend"
+            @toggle-auto-play="onToggleAutoPlay"
           />
         </main>
       </template>

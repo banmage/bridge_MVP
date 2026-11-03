@@ -1,9 +1,13 @@
 import type { Position } from '../src/models/gameState';
-import { ORDER } from '../src/models/gameState';
+import { getSide, ORDER } from '../src/models/gameState';
 import {
+  DEFAULT_BIDDING_SYSTEMS,
   isBoardCount,
   isScoringMode,
+  normalizeBiddingSystems,
   PROTOCOL_VERSION,
+  type BiddingSystem,
+  type BiddingSystems,
   type ChatMessage,
   type MatchConfig,
   type RoomConfigInput,
@@ -52,6 +56,8 @@ export interface Room {
   status: RoomStatus;
   config: MatchConfig;
   seats: Record<Position, SeatOccupant>;
+  /** 主动托管：真人座位仍保留，但由 AI 代叫/代打 */
+  autoPlay: Partial<Record<Position, boolean>>;
   match: MatchEngine | null;
   chat: ChatMessage[];
   /** 加入顺序（首位为房主），用于房主转移 */
@@ -196,8 +202,10 @@ export class RoomManager {
         scoring: config.scoring,
         seedBase: this.seedBase ?? randomSeed(),
         matchId: `m_${now.toString(36)}_${code.toLowerCase()}`,
+        systems: normalizeBiddingSystems(config.systems, DEFAULT_BIDDING_SYSTEMS),
       },
       seats,
+      autoPlay: {},
       match: null,
       chat: [],
       joinOrder: [player.playerId],
@@ -259,6 +267,7 @@ export class RoomManager {
     }
 
     const seat = this.seatOf(room, playerId);
+    if (seat) delete room.autoPlay[seat];
     room.joinOrder = room.joinOrder.filter((id) => id !== playerId);
 
     if (room.status === 'lobby') {
@@ -343,6 +352,7 @@ export class RoomManager {
     this.assertLobby(room);
     this.assertPosition(seat);
 
+    delete room.autoPlay[seat];
     if (input.kind === 'open') {
       const current = room.seats[seat];
       if (current.kind === 'human') {
@@ -363,7 +373,10 @@ export class RoomManager {
           room.hostId = room.joinOrder[0];
         }
       }
-      room.seats[seat] = { kind: 'bot', persona: sanitizePersona(input.persona) };
+      const persona = sanitizePersona(input.persona);
+      room.seats[seat] = { kind: 'bot', persona };
+      // 同方体系保持一致：设置一方机器人时同步同伴与房间配置
+      this.setSideSystem(room, getSide(seat), persona.system);
     }
     room.updatedAt = this.now();
     return room;
@@ -377,7 +390,10 @@ export class RoomManager {
     if (room.seats[seat].kind !== 'bot') {
       throw new MatchError('WRONG_PHASE', '该座位不是机器人');
     }
-    room.seats[seat] = { kind: 'bot', persona: sanitizePersona(persona) };
+    const sanitized = sanitizePersona(persona);
+    room.seats[seat] = { kind: 'bot', persona: sanitized };
+    // 修改一方机器人体系时，同伴自动切换为同一体系
+    this.setSideSystem(room, getSide(seat), sanitized.system);
     room.updatedAt = this.now();
     return room;
   }
@@ -387,7 +403,27 @@ export class RoomManager {
     this.assertHost(room, playerId);
     this.assertLobby(room);
     this.assertConfig(config);
-    room.config = { ...room.config, boards: config.boards, scoring: config.scoring };
+    const systems = normalizeBiddingSystems(config.systems, this.systemsOf(room));
+    room.config = { ...room.config, boards: config.boards, scoring: config.scoring, systems };
+    this.syncSystems(room);
+    room.updatedAt = this.now();
+    return room;
+  }
+
+  /** 主动托管：保留真人座位，交给 AI 代叫/代打；可随时解除 */
+  setAutoPlay(playerId: string, code: string, enabled: boolean): Room {
+    const room = this.requirePlayingRoom(playerId, code);
+    const seat = this.seatOf(room, playerId);
+    if (!seat || room.seats[seat].kind !== 'human') {
+      throw new MatchError('WRONG_PHASE', '只有自己的真人座位可以托管');
+    }
+    if (enabled) room.autoPlay = { ...room.autoPlay, [seat]: true };
+    else {
+      const next = { ...room.autoPlay };
+      delete next[seat];
+      room.autoPlay = next;
+    }
+    room.match!.setAutoPlay(seat, enabled);
     room.updatedAt = this.now();
     return room;
   }
@@ -407,6 +443,13 @@ export class RoomManager {
       }
     }
 
+    // 开赛前再同步一次：保证同方同伴体系一致，旧配置也补上默认精确体系
+    room.config = {
+      ...room.config,
+      systems: normalizeBiddingSystems(room.config.systems, DEFAULT_BIDDING_SYSTEMS),
+    };
+    this.syncSystems(room);
+
     const seats = {} as Record<Position, EngineSeat>;
     for (const pos of POSITIONS) {
       const seat = room.seats[pos];
@@ -417,6 +460,7 @@ export class RoomManager {
       }
     }
 
+    room.autoPlay = {};
     room.match = new MatchEngine({
       config: { ...room.config },
       seats,
@@ -524,18 +568,53 @@ export class RoomManager {
    * 内部
    * ---------------------------------------------------------------- */
 
+  /** 房间当前的每方体系（旧配置缺省为精确） */
+  private systemsOf(room: Room): BiddingSystems {
+    return normalizeBiddingSystems(room.config.systems, DEFAULT_BIDDING_SYSTEMS);
+  }
+
+  /**
+   * 设置某一方的叫牌体系，并同步该方机器人同伴，
+   * 保证一方内两名玩家（含机器人）始终使用同一体系。
+   */
+  private setSideSystem(room: Room, side: 'NS' | 'EW', system: BiddingSystem): void {
+    const systems = { ...this.systemsOf(room), [side]: system };
+    room.config = { ...room.config, systems };
+    this.syncSystems(room);
+  }
+
+  /** 把每方体系写回该方所有机器人座位 */
+  private syncSystems(room: Room): void {
+    const systems = this.systemsOf(room);
+    for (const pos of POSITIONS) {
+      const seat = room.seats[pos];
+      if (seat.kind !== 'bot') continue;
+      const system = systems[getSide(pos)];
+      if (seat.persona.system !== system) {
+        seat.persona = { ...seat.persona, system };
+      }
+    }
+  }
+
   private takeover(room: Room, seat: Position, reclaimable = true): void {
     const current = room.seats[seat];
     const name = current.kind === 'human' ? current.name : '玩家';
     const previousPlayerId = current.kind === 'human' ? current.playerId : null;
-    const persona = defaultPersonaFor(`${name}的托管`, `takeover-${seat}-${this.now()}`);
+    const persona = defaultPersonaFor(
+      `${name}的托管`,
+      `takeover-${seat}-${this.now()}`,
+      this.systemsOf(room)[getSide(seat)],
+    );
     room.seats[seat] = { kind: 'bot', persona };
+    // 转成机器人后主动托管标记不再需要
+    delete room.autoPlay[seat];
     if (previousPlayerId && reclaimable) {
       room.takeovers[seat] = { playerId: previousPlayerId, name, at: this.now() };
     } else {
       delete room.takeovers[seat];
     }
     if (room.match) {
+      room.match.setAutoPlay(seat, false);
       room.match.takeoverSeat(seat, persona);
       room.match.seats = { ...room.match.seats };
     }
@@ -563,11 +642,15 @@ export class RoomManager {
       connected: true,
     };
     delete room.takeovers[seat];
+    delete room.autoPlay[seat];
     this.awaySince.delete(playerId);
     if (!room.joinOrder.includes(playerId)) room.joinOrder.push(playerId);
     // 原房主被托管后房主已转给他人；只有在无人可当房主时才补位
     if (!room.hostId) room.hostId = playerId;
-    if (room.match) room.match.reclaimSeat(seat, playerId, info.name);
+    if (room.match) {
+      room.match.setAutoPlay(seat, false);
+      room.match.reclaimSeat(seat, playerId, info.name);
+    }
     room.updatedAt = this.now();
     return true;
   }

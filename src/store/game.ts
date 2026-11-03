@@ -49,12 +49,13 @@ import {
   type RuleValidationResult,
 } from '../engine/loader';
 import { canEditRules as canEditRulesFor, type UserRole } from '../permissions';
+import { PLAY_DISPLAY_MS } from '@shared/protocol';
 
 /** AI 叫牌前的思考延迟（出牌节奏由 PLAY_DISPLAY_MS 控制） */
 export const AI_DELAY_MS = 800;
 
-/** 每张出牌至少展示的时长：展示满后才进行下一个动作（含自动出牌） */
-export const PLAY_DISPLAY_MS = 1000;
+/** 每张出牌至少展示的时长：与服务端共用同一常量，展示满后才进行下一个动作 */
+export { PLAY_DISPLAY_MS };
 
 const VULNERABILITIES: GameState['vulnerability'][] = ['none', 'NS', 'EW', 'both'];
 

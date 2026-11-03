@@ -177,6 +177,22 @@ describe('进行中房间快照', () => {
     expect(restored.match?.seats.S.kind).toBe('human');
   });
 
+  it('主动托管标记随快照恢复，重启后仍由 AI 代打', () => {
+    const manager = new RoomManager({ seedBase: 7, codes: ['SNAP05'] });
+    const room = playingRoom(manager, 'SNAP05');
+    manager.setAutoPlay('p-host', 'SNAP05', true);
+    expect(room.autoPlay.S).toBe(true);
+    saveRoomSnapshot(room);
+
+    const restoredManager = new RoomManager({ seedBase: 7 });
+    expect(restoredManager.restoreRooms(loadRoomSnapshots())).toBe(1);
+    const restored = restoredManager.getRoom('SNAP05');
+    expect(restored.seats.S.kind).toBe('human');
+    expect(restored.autoPlay.S).toBe(true);
+    expect(restored.match?.autoPlay.S).toBe(true);
+    expect(restored.match?.pendingBotSeat()).toBe(restored.match?.board?.currentBidder);
+  });
+
   it('损坏快照会被跳过，且支持删除', () => {
     const manager = new RoomManager({ seedBase: 7, codes: ['SNAP03'] });
     const room = playingRoom(manager, 'SNAP03');

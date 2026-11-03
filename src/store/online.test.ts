@@ -196,5 +196,37 @@ describe('在线状态 store', () => {
 
     expect(store.error).toMatchObject({ code: 'ILLEGAL_PLAY' });
     expect(store.toasts.at(-1)).toMatchObject({ message: '该牌不合法', level: 'warn' });
+    // 顶部提示同时进入聊天，并标记为系统消息
+    expect(store.chatMessages.at(-1)).toMatchObject({
+      from: '系统',
+      text: '该牌不合法',
+      system: true,
+    });
+  });
+
+  it('服务端 toast 与房间解散提示都进入系统消息', () => {
+    const store = useOnlineStore();
+    store.init();
+    emit({ v: 1, t: 'room', room: makeRoom({ status: 'playing' }) });
+
+    emit({ v: 1, t: 'toast', message: '比赛开始', level: 'info' });
+    expect(store.chatMessages.at(-1)).toMatchObject({ text: '比赛开始', system: true });
+
+    emit({ v: 1, t: 'error', code: 'ROOM_NOT_FOUND', message: '房间不存在或已解散' });
+    expect(store.chatMessages.at(-1)).toMatchObject({
+      text: '牌室已解散或不存在',
+      system: true,
+    });
+    // 系统消息与玩家聊天按时间合并，系统消息排在最后
+    expect(store.chatMessages.map((message) => message.system)).toEqual([true, true]);
+  });
+
+  it('主动托管发送 setAutoPlay 报文', () => {
+    const store = useOnlineStore();
+    store.init();
+    store.setAutoPlay(true);
+    expect(socketMock.sent.at(-1)).toMatchObject({ t: 'setAutoPlay', enabled: true });
+    store.setAutoPlay(false);
+    expect(socketMock.sent.at(-1)).toMatchObject({ t: 'setAutoPlay', enabled: false });
   });
 });

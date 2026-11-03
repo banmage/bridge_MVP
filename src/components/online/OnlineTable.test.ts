@@ -93,11 +93,11 @@ function makeRoom(board: BoardView): RoomView {
   };
 }
 
-function mountTable(board: BoardView) {
+function mountTable(board: BoardView, roomOverrides: Partial<RoomView> = {}) {
   const pinia = createPinia();
   setActivePinia(pinia);
   return mount(OnlineTable, {
-    props: { room: makeRoom(board) },
+    props: { room: { ...makeRoom(board), ...roomOverrides } },
     global: { plugins: [pinia, ElementPlus] },
   });
 }
@@ -250,11 +250,13 @@ describe('OnlineTable 联网牌桌布局', () => {
     const active = mountTable(board);
     await active.vm.$nextTick();
     expect(active.find('.hand.pos-S .playing-card.recommended').exists()).toBe(false);
-    expect(active.get('.hand.pos-S .play-hint-arrow').text()).toBe('▼');
+    expect(active.get('.hand.pos-S .turn-arrow.variant-card').attributes('aria-label')).toBe(
+      '推荐出牌',
+    );
 
     const slot = active
       .findAll('.hand.pos-S .card-slot')
-      .find((item) => item.find('.play-hint-arrow').exists());
+      .find((item) => item.find('.turn-arrow.variant-card').exists());
     expect(slot).toBeTruthy();
     const recommended = slot!.get('.playing-card');
     // 必须跟黑桃，推荐只能是 ♠A
@@ -263,7 +265,7 @@ describe('OnlineTable 联网牌桌布局', () => {
 
     const idle = mountTable({ ...board, canAct: false, actingForSeat: null });
     await idle.vm.$nextTick();
-    expect(idle.find('.play-hint-arrow').exists()).toBe(false);
+    expect(idle.find('.turn-arrow.variant-card').exists()).toBe(false);
   });
 
   it('按观看者座位旋转牌桌：自己在下、同伴在上，出牌区同步旋转', async () => {
@@ -298,6 +300,31 @@ describe('OnlineTable 联网牌桌布局', () => {
     expect(slots[1]).toContain('slot-S');
     expect(slots[2]).toContain('slot-W');
     expect(slots[3]).toContain('slot-N');
+  });
+
+  it('右下角提供托管按钮，托管中显示解除并标记座位', async () => {
+    const board = makeBoard({
+      phase: 'play',
+      nextPlayer: 'S',
+      contract: { level: 1, suit: 'NT', doubled: false, redoubled: false, declarer: 'S', dummy: 'N' },
+    });
+
+    const manual = mountTable(board);
+    const button = manual.get('.auto-play-btn');
+    expect(button.text()).toBe('托管');
+    expect(button.attributes('aria-pressed')).toBe('false');
+    expect(manual.find('.auto-tag').exists()).toBe(false);
+    await button.trigger('click');
+    expect(manual.emitted('toggle-auto-play')).toHaveLength(1);
+
+    const auto = mountTable(board, {
+      you: { playerId: 'p1', name: 'Alice', seat: 'S', autoPlay: true },
+    });
+    const autoButton = auto.get('.auto-play-btn');
+    expect(autoButton.text()).toBe('解除托管');
+    expect(autoButton.attributes('aria-pressed')).toBe('true');
+    expect(autoButton.classes()).toContain('active');
+    expect(auto.get('.auto-tag').text()).toBe('托管中');
   });
 
   it('左下角常驻聊天，发送时向父组件派发 chat-send', async () => {

@@ -4,7 +4,7 @@ import { FINAL_PASS_TEXT, useGameStore, describeCall, suitName } from '../store/
 import { auctionRows } from '../core/bidding/auctionGrid';
 import { explainBidRecord } from '../core/bidding/hints';
 import type { BiddingRule } from '../engine/types';
-import type { BidRecord, Position } from '../models/gameState';
+import { getSide, type BidRecord, type Position } from '../models/gameState';
 import HintVeil from './HintVeil.vue';
 
 /**
@@ -21,6 +21,8 @@ const props = withDefaults(
     currentBidder?: Position | null;
     /** 用于生成本桌叫品解释的规则资产；缺省使用单机 store 的规则 */
     biddingRules?: BiddingRule[] | null;
+    /** 联网双方体系可能不同：按叫牌人所在方选择解释规则 */
+    biddingRulesBySide?: Partial<Record<'NS' | 'EW', BiddingRule[]>> | null;
   }>(),
   {
     variant: 'panel',
@@ -28,6 +30,7 @@ const props = withDefaults(
     phase: null,
     currentBidder: null,
     biddingRules: null,
+    biddingRulesBySide: null,
   },
 );
 
@@ -105,7 +108,8 @@ const bidRounds = computed<(BidCell | null)[][]>(() => {
   history.value.forEach((rec, i) => {
     const r = rowIndices[i] ?? 0;
     if (!rows[r]) rows[r] = [null, null, null, null];
-    const explanation = explainBidRecord(rules.value, history.value, i);
+    const seatRules = props.biddingRulesBySide?.[getSide(rec.position)] ?? rules.value;
+    const explanation = explainBidRecord(seatRules, history.value, i);
     rows[r][COLUMNS.indexOf(rec.position)] = toBidCell(rec, i === finalPassIndex.value, explanation);
   });
 

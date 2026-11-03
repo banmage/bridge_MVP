@@ -142,6 +142,7 @@ src/
 | FR-003/004 | `server/room.ts`、`SeatConfigPanel.vue` | `room.test.ts` |
 | FR-007 | `server/room.ts`、`server/protocolHandlers.ts` | `room.test.ts`、`protocolHandlers.test.ts` |
 | FR-008..011 | `server/personas.ts`、`server/match.ts` | `match.test.ts` 人格/节奏 |
+| FR-029..033 | `hints.ts`、`playHint.ts`、`server/match.ts`、`server/room.ts`、`shared/protocol.ts`、`store/online.ts` | `hints/playHint/match/room/protocolHandlers/view/roomSnapshot/online/OnlineChat/OnlineTable` 测试 |
 | FR-012/013 | `shared/matchSchedule.ts`、`server/match.ts` | `match.test.ts` 轮转/种子复现 |
 | FR-014..016 | `server/match.ts` + `core/*` | `match.test.ts` 非法动作 |
 | FR-017/018 | `server/match.ts`、`reference.ts` | `match.test.ts`、`reference.test.ts` |

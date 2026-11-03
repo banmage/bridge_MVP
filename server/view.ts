@@ -1,11 +1,13 @@
 import type { Position } from '../src/models/gameState';
 import { ORDER } from '../src/models/gameState';
-import type {
-  BoardView,
-  MatchConfig,
-  MatchResult,
-  RoomView,
-  SeatOccupant,
+import {
+  DEFAULT_BIDDING_SYSTEMS,
+  normalizeBiddingSystems,
+  type BoardView,
+  type MatchConfig,
+  type MatchResult,
+  type RoomView,
+  type SeatOccupant,
 } from '../shared/protocol';
 import type { MatchEngine } from './match';
 import type { Room } from './room';
@@ -37,7 +39,10 @@ function cloneSeat(seat: SeatOccupant): SeatOccupant {
 }
 
 function configOf(room: Room): MatchConfig {
-  return { ...room.config };
+  return {
+    ...room.config,
+    systems: normalizeBiddingSystems(room.config.systems, DEFAULT_BIDDING_SYSTEMS),
+  };
 }
 
 export function projectBoardView(engine: MatchEngine, playerId: string): BoardView | null {
@@ -113,6 +118,7 @@ export function projectRoomView(
       name: name || takeoverName,
       seat,
       ...(reclaimableSeat ? { reclaimableSeat } : {}),
+      ...(seat && room.autoPlay[seat] ? { autoPlay: true } : {}),
     },
     config: configOf(room),
     seats,

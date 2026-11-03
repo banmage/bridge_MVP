@@ -1,5 +1,6 @@
 import type { Position } from '../src/models/gameState';
 import {
+  PLAY_DISPLAY_MS,
   PROTOCOL_VERSION,
   type ClientMessage,
   type ErrorCode,
@@ -294,6 +295,12 @@ export class GameHub {
         this.broadcast(room);
         return;
       }
+      case 'setAutoPlay': {
+        const room = this.requireRoom(client);
+        this.rooms.setAutoPlay(client.playerId, room.code, msg.enabled);
+        this.afterAction(room);
+        return;
+      }
       case 'startMatch': {
         const room = this.requireRoom(client);
         this.rooms.startMatch(client.playerId, room.code);
@@ -407,20 +414,30 @@ export class GameHub {
   private scheduleAi(room: Room): void {
     if (room.status !== 'playing' || !room.match) return;
     if (this.aiTimers.has(room.code)) return;
-    if (!room.match.pendingBotSeat()) return;
+    const forced = room.match.pendingForcedSeat();
+    if (!forced && !room.match.pendingBotSeat()) return;
+
+    // 出牌阶段先让上一张牌展示满 PLAY_DISPLAY_MS；唯一合法牌自动打出同样遵守，
+    // 避免玩家还没看清上一张牌，牌就已经被系统打出去了。
+    let delay = this.aiDelayMs;
+    const board = room.match.board;
+    if (board && (board.phase === 'play' || board.phase === 'play_waiting_lead')) {
+      const elapsed = board.lastPlayAt ? Date.now() - board.lastPlayAt : PLAY_DISPLAY_MS;
+      delay = Math.max(delay, PLAY_DISPLAY_MS - elapsed);
+    }
 
     const timer = this.setTimer(() => {
       this.aiTimers.delete(room.code);
       if (room.status !== 'playing' || !room.match) return;
       try {
-        const step = room.match.runAiStep();
+        const step = room.match.runAutoStep();
         if (!step) return;
         this.afterAction(room);
       } catch {
-        // 机器人异常时停止推进，避免死循环；真人可继续操作或房主重开
+        // AI 异常时停止推进，避免死循环；真人可继续操作或房主重开
         this.broadcast(room);
       }
-    }, this.aiDelayMs);
+    }, delay);
     const maybeUnref = timer as unknown as { unref?: () => void };
     maybeUnref.unref?.();
     this.aiTimers.set(room.code, timer);

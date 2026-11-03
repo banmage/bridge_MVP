@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import BidHistory from './BidHistory.vue';
+import type { BiddingRule } from '../engine/types';
 import { useGameStore } from '../store/game';
 
 describe('BidHistory 叫牌结束符', () => {
@@ -124,6 +125,40 @@ describe('BidHistory 联网快照模式', () => {
     await alerted.trigger('mouseleave');
     expect(wrapper.find('.hint-veil').exists()).toBe(false);
     expect(wrapper.get('.bid-cell.thinking .bid-label').text()).toBe('？');
+  });
+
+  it('双方体系不同时，历史叫品按叫牌人所在方解释', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const rule = (id: string, action: string, description: string): BiddingRule => ({
+      id,
+      action,
+      description,
+      sequence: '*',
+      when: {},
+      priority: 1,
+    });
+    const wrapper = mount(BidHistory, {
+      props: {
+        biddingHistory: [
+          { position: 'N', call: { type: 'bid', level: 1, suit: 'H' } },
+          { position: 'E', call: { type: 'bid', level: 1, suit: 'S' } },
+        ],
+        phase: 'play',
+        biddingRulesBySide: {
+          NS: [rule('ns-1h', '1H', '南北精确：1H 开叫')],
+          EW: [rule('ew-1s', '1S', '东西自然：1S 开叫')],
+        },
+      },
+      global: { plugins: [pinia] },
+    });
+
+    const cells = wrapper.findAll('.bid-cell');
+    await cells[0].trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('南北精确：1H 开叫');
+
+    await cells[1].trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('东西自然：1S 开叫');
   });
 
   it('外部阶段为打牌中时，最后一个 Pass 显示结束符', () => {

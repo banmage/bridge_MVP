@@ -14,7 +14,7 @@ import { createDeck, deal, shuffle } from '../src/core/deck';
 import { hcp } from '../src/core/evaluate';
 import { isCallLegal } from '../src/core/bidding/validator';
 import { biddingOutcome, findDeclarer } from '../src/core/bidding/auction';
-import { isCardLegal } from '../src/core/playing';
+import { getLegalCards, isCardLegal } from '../src/core/playing';
 import { determineTrickWinner } from '../src/core/trick';
 import { computeScore } from '../src/core/scoring';
 import { hcpAdjustedPoints, impsFromScoreDiff } from '../src/core/imps';
@@ -25,14 +25,16 @@ import type {
   BoardPhase,
   BoardScoring,
   BoardSummary,
+  BiddingSystems,
   BotPersona,
   ErrorCode,
   MatchConfig,
   MatchResult,
   Vulnerability,
 } from '../shared/protocol';
+import { normalizeBiddingSystems } from '../shared/protocol';
 import { describeContract } from '../shared/format';
-import { botBid, leadsForPersona, styleOf } from './personas';
+import { botBid, defaultPersonaFor, leadsForPersona, styleOf } from './personas';
 
 /** 服务端对局错误：携带协议错误码，便于直接回给客户端 */
 export class MatchError extends Error {
@@ -118,6 +120,8 @@ export interface MatchEngineOptions {
 export interface MatchEngineSnapshot {
   config: MatchConfig;
   seats: Record<Position, EngineSeat>;
+  /** 主动托管：保留真人座位，但由 AI 代打 */
+  autoPlay: Partial<Record<Position, boolean>>;
   board: BoardState | null;
   completed: BoardRecord[];
   status: MatchStatus;
@@ -147,6 +151,8 @@ export function matchpointPercent(nsScore: number, referenceScores: number[]): n
 export class MatchEngine {
   readonly config: MatchConfig;
   seats: Record<Position, EngineSeat>;
+  /** 主动托管：座位仍是真人，但由 AI 代叫/代打 */
+  autoPlay: Partial<Record<Position, boolean>> = {};
   board: BoardState | null = null;
   completed: BoardRecord[] = [];
   status: MatchStatus = 'idle';
@@ -170,6 +176,7 @@ export class MatchEngine {
     return {
       config: deepCopy(this.config),
       seats: deepCopy(this.seats),
+      autoPlay: deepCopy(this.autoPlay),
       board: this.board ? deepCopy(this.board) : null,
       completed: deepCopy(this.completed),
       status: this.status,
@@ -196,6 +203,7 @@ export class MatchEngine {
       ...(opts.referenceScores ? { referenceScores: opts.referenceScores } : {}),
       ...(opts.rngFactory ? { rngFactory: opts.rngFactory } : {}),
     });
+    engine.autoPlay = deepCopy(snapshot.autoPlay ?? {});
     engine.board = snapshot.board ? deepCopy(snapshot.board) : null;
     engine.completed = deepCopy(snapshot.completed ?? []);
     engine.status = snapshot.status;
@@ -424,20 +432,62 @@ export class MatchEngine {
    * AI 调度
    * ---------------------------------------------------------------- */
 
-  /** 当前应由机器人行动时返回座位，否则返回 null */
+  /** 该方当前使用的叫牌体系（旧配置缺省为精确） */
+  systemForSide(side: 'NS' | 'EW'): BiddingSystems['NS'] {
+    return normalizeBiddingSystems(this.config.systems)[side];
+  }
+
+  /** 主动托管开关：座位仍是真人，但由 AI 代叫/代打 */
+  setAutoPlay(seat: Position, enabled: boolean): void {
+    if (enabled) this.autoPlay = { ...this.autoPlay, [seat]: true };
+    else {
+      const next = { ...this.autoPlay };
+      delete next[seat];
+      this.autoPlay = next;
+    }
+  }
+
+  /** 该控制器是否由 AI 操作（机器人座位或真人主动托管） */
+  private isAiControlled(pos: Position): boolean {
+    return this.seats[pos].kind === 'bot' || !!this.autoPlay[pos];
+  }
+
+  /** 当前应由 AI（机器人或托管真人）行动时返回座位，否则返回 null */
   pendingBotSeat(): Position | null {
     const board = this.board;
     if (!board) return null;
     if (board.phase === 'bidding') {
       const seat = board.currentBidder;
-      return this.seats[seat].kind === 'bot' ? seat : null;
+      return this.isAiControlled(seat) ? seat : null;
     }
     if (board.phase === 'play' || board.phase === 'play_waiting_lead') {
       const seat = board.nextPlayer;
       if (!seat) return null;
-      return this.seats[this.controllerOf(seat)].kind === 'bot' ? seat : null;
+      return this.isAiControlled(this.controllerOf(seat)) ? seat : null;
     }
     return null;
+  }
+
+  /** 当前座位所有合法出牌 */
+  legalCardsFor(seat: Position): Hand {
+    const board = this.board;
+    if (!board || !board.contract) return [];
+    const leadSuit =
+      board.currentTrick.length === 0 ? null : suitOfCard(board.currentTrick[0].card);
+    return getLegalCards(board.hands[seat], leadSuit, trumpOf(board.contract));
+  }
+
+  /**
+   * 只剩唯一合法出牌时返回该座位（无论真人还是机器人）。
+   * 唯一合法牌没有选择余地，联网版也自动打出，不等待玩家操作。
+   */
+  pendingForcedSeat(): Position | null {
+    const board = this.board;
+    if (!board) return null;
+    if (board.phase !== 'play' && board.phase !== 'play_waiting_lead') return null;
+    const seat = board.nextPlayer;
+    if (!seat) return null;
+    return this.legalCardsFor(seat).length === 1 ? seat : null;
   }
 
   /** 该玩家此刻是否可以操作（供视角投影与客户端判断） */
@@ -450,17 +500,25 @@ export class MatchEngine {
     if (!seat) return false;
     const controller = this.controllerOf(seat);
     const occupant = this.seats[controller];
-    return occupant.kind === 'human' && occupant.playerId === playerId;
+    if (occupant.kind !== 'human' || occupant.playerId !== playerId) return false;
+    // 唯一合法牌会自动打出；主动托管时也由 AI 操作，不再等待真人
+    return !this.autoPlay[controller] && this.pendingForcedSeat() === null;
   }
 
-  /** 执行一步机器人动作；返回 null 表示当前无机器人可动 */
+  /** 执行一步 AI 动作；返回 null 表示当前无 AI 可动 */
   runAiStep(): { seat: Position; action: 'bid' | 'play'; message: string } | null {
     const board = this.board;
     const seat = this.pendingBotSeat();
     if (!board || !seat) return null;
-    const occupant = this.seats[this.controllerOf(seat)];
-    const persona = occupant.persona;
-    if (!persona) return null;
+    const controller = this.controllerOf(seat);
+    const occupant = this.seats[controller];
+    const persona =
+      occupant.persona ??
+      defaultPersonaFor(
+        occupant.name,
+        `auto-${controller}-${seat}`,
+        this.systemForSide(getSide(controller)),
+      );
 
     if (board.phase === 'bidding') {
       const result = botBid(
@@ -491,6 +549,21 @@ export class MatchEngine {
     );
     this.applyPlay(seat, card);
     return { seat, action: 'play', message: `${occupant.name} 出一张牌` };
+  }
+
+  /**
+   * 调度器执行一步：优先处理唯一合法牌（真人/机器人一致），
+   * 否则交给机器人或托管真人的 AI。
+   */
+  runAutoStep(): { seat: Position; action: 'bid' | 'play'; message: string } | null {
+    const forced = this.pendingForcedSeat();
+    if (forced) {
+      const card = this.legalCardsFor(forced)[0];
+      const occupant = this.seats[this.controllerOf(forced)];
+      this.applyPlay(forced, card);
+      return { seat: forced, action: 'play', message: `${occupant.name} 自动出牌` };
+    }
+    return this.runAiStep();
   }
 
   /* ---------------------------------------------------------------- *

@@ -11,7 +11,16 @@ export type ScoringMode = 'mp' | 'hcp-points';
 export type BoardCount = 12 | 18 | 24;
 export type Risk = 'conservative' | 'normal' | 'aggressive';
 export type BiddingSystem = 'precision' | 'natural';
+export type Side = 'NS' | 'EW';
+/** 每一方（南北 / 东西）统一使用的叫牌体系 */
+export type BiddingSystems = Record<Side, BiddingSystem>;
 export type ConventionKey = 'strong_nt' | 'negative_double' | 'weak_two' | 'stayman' | 'transfer';
+
+/** 系统默认使用精确叫牌法；同方同伴必须保持一致 */
+export const DEFAULT_BIDDING_SYSTEMS: BiddingSystems = { NS: 'precision', EW: 'precision' };
+
+/** 每张出牌至少展示的时长（联网与单机一致） */
+export const PLAY_DISPLAY_MS = 1000;
 
 export const CONVENTION_LABELS: Record<ConventionKey, string> = {
   strong_nt: '强无将（15-17）',
@@ -66,6 +75,8 @@ export interface MatchConfig {
   /** 比赛种子基值：每副 seed = hash(seedBase, index) */
   seedBase: number;
   matchId: string;
+  /** 每方叫牌体系（旧快照可能没有，缺省为精确） */
+  systems?: BiddingSystems;
 }
 
 export type SeatOccupant =
@@ -82,6 +93,8 @@ export interface ChatMessage {
   from: string;
   seat: Position | null;
   text: string;
+  /** 系统提示（房间解散、错误说明等），与玩家聊天区分显示 */
+  system?: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -157,6 +170,8 @@ export interface RoomView {
     seat: Position | null;
     /** 若原座位已被超时托管，给出可收回的座位（同一身份重连时自动收回） */
     reclaimableSeat?: Position | null;
+    /** 当前座位是否开启了主动托管（AI 代打，座位仍归本人） */
+    autoPlay?: boolean;
   };
   config: MatchConfig;
   seats: Record<Position, SeatView>;
@@ -192,6 +207,8 @@ export type ErrorCode =
 export interface RoomConfigInput {
   boards: BoardCount;
   scoring: ScoringMode;
+  /** 每方叫牌体系；缺省保持房间当前设置（默认精确） */
+  systems?: Partial<BiddingSystems>;
 }
 
 export type SeatInput = { kind: 'open' } | { kind: 'bot'; persona: BotPersona };
@@ -205,6 +222,7 @@ export type ClientMessage =
   | { v: number; t: 'setSeat'; seat: Position; occupant: SeatInput }
   | { v: number; t: 'updateBot'; seat: Position; persona: BotPersona }
   | { v: number; t: 'setConfig'; config: RoomConfigInput }
+  | { v: number; t: 'setAutoPlay'; enabled: boolean }
   | { v: number; t: 'startMatch' }
   | { v: number; t: 'bid'; call: BidCall; alert?: { text: string } }
   | { v: number; t: 'play'; card: number }
@@ -230,4 +248,22 @@ export function isBoardCount(value: unknown): value is BoardCount {
 
 export function isScoringMode(value: unknown): value is ScoringMode {
   return value === 'mp' || value === 'hcp-points';
+}
+
+export function isBiddingSystem(value: unknown): value is BiddingSystem {
+  return value === 'precision' || value === 'natural';
+}
+
+/**
+ * 合并每方体系设置：非法或缺失时保留 fallback（默认精确）。
+ * 服务端与客户端共用，保证旧快照/旧配置也能得到稳定结果。
+ */
+export function normalizeBiddingSystems(
+  input?: Partial<BiddingSystems> | null,
+  fallback: BiddingSystems = DEFAULT_BIDDING_SYSTEMS,
+): BiddingSystems {
+  return {
+    NS: isBiddingSystem(input?.NS) ? input.NS : fallback.NS,
+    EW: isBiddingSystem(input?.EW) ? input.EW : fallback.EW,
+  };
 }

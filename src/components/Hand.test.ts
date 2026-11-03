@@ -84,10 +84,12 @@ describe('Hand 牌面布局', () => {
     expect(wrapper.find('.playing-card.recommended').exists()).toBe(false);
     const slot = wrapper
       .findAll('.card-slot')
-      .find((item) => item.find('.play-hint-arrow').exists());
+      .find((item) => item.find('.turn-arrow.variant-card').exists());
     expect(slot).toBeTruthy();
     expect(slot!.get('.playing-card').attributes('data-rank')).toBe('A');
-    expect(slot!.get('.play-hint-arrow').text()).toBe('▼');
+    const arrow = slot!.get('.turn-arrow.variant-card');
+    expect(arrow.attributes('aria-label')).toBe('推荐出牌');
+    expect(arrow.find('svg').exists()).toBe(true);
 
     await slot!.trigger('mouseenter');
     expect(wrapper.get('.hint-veil').text()).toContain('推荐出牌');

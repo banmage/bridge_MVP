@@ -6,7 +6,22 @@ import type { ChatMessage } from '@shared/protocol';
  * 左下方常驻聊天面板：只占牌桌角落，消息区可滚动。
  * 新消息到达时自动滚到底部；发送后清空输入框。
  */
-const props = defineProps<{ messages: ChatMessage[] }>();
+const props = withDefaults(
+  defineProps<{
+    messages: ChatMessage[];
+    /** 内联展示（无房间时嵌入页面，而不是浮在牌桌角落） */
+    inline?: boolean;
+    /** 只读：隐藏输入框，仅展示消息（房间已解散等场景） */
+    readonly?: boolean;
+    /** 面板标题 */
+    title?: string;
+  }>(),
+  {
+    inline: false,
+    readonly: false,
+    title: '聊天',
+  },
+);
 const emit = defineEmits<{ (e: 'send', text: string): void }>();
 
 const text = ref('');
@@ -35,19 +50,28 @@ function send(): void {
 </script>
 
 <template>
-  <section class="room-chat" aria-label="房间聊天">
+  <section
+    class="room-chat"
+    :class="{ inline, readonly }"
+    :aria-label="readonly ? '房间系统消息' : '房间聊天'"
+  >
     <header class="chat-head">
-      <span>聊天</span>
+      <span>{{ title }}</span>
       <span class="chat-count">{{ messages.length }}</span>
     </header>
     <div ref="listRef" class="chat-list">
-      <p v-for="message in messages" :key="message.id" class="chat-line">
-        <strong>{{ message.from }}</strong>
+      <p
+        v-for="message in messages"
+        :key="message.id"
+        class="chat-line"
+        :class="{ system: message.system }"
+      >
+        <strong>{{ message.system ? '系统' : message.from }}</strong>
         <span>{{ message.text }}</span>
       </p>
       <p v-if="messages.length === 0" class="chat-empty">还没有消息</p>
     </div>
-    <div class="chat-send">
+    <div v-if="!readonly" class="chat-send">
       <input
         v-model="text"
         type="text"
@@ -116,6 +140,32 @@ function send(): void {
   color: #ffe19a;
   font-weight: 700;
 }
+/* 系统提示：与玩家发言区分，使用琥珀色并轻微倾斜 */
+.chat-line.system {
+  padding: 2px 5px;
+  border-left: 2px solid rgba(255, 193, 94, 0.75);
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 193, 94, 0.1);
+  color: #ffdf9f;
+  font-style: italic;
+}
+.chat-line.system strong {
+  color: #ffc15e;
+}
+/* 内联模式：无房间时嵌入页面，不覆盖牌桌 */
+.room-chat.inline {
+  position: static;
+  width: 100%;
+  height: 168px;
+  margin-top: 2px;
+  background: rgba(6, 32, 21, 0.72);
+}
+.room-chat.inline .chat-list {
+  padding: 6px 9px;
+}
+.room-chat.inline .chat-line {
+  font-size: 12px;
+}
 .chat-empty {
   margin: 6px 0 0;
   color: rgba(234, 245, 238, 0.45);
@@ -156,6 +206,9 @@ function send(): void {
 @media (max-width: 880px) {
   .room-chat {
     display: none;
+  }
+  .room-chat.inline {
+    display: flex;
   }
 }
 </style>

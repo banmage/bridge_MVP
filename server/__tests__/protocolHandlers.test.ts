@@ -163,6 +163,43 @@ describe('房间与开赛', () => {
     expect(after.bidding[0].position).toBe('N');
   });
 
+  it('主动托管广播本人状态，解除后恢复手动', () => {
+    const { hub } = setup();
+    const a = connect(hub, 'p-1', 'Alice');
+    hub.receive('p-1', {
+      v: 1,
+      t: 'createRoom',
+      config: { boards: 12, scoring: 'mp' },
+      seat: 'S',
+    });
+    for (const seat of ['N', 'E', 'W'] as const) {
+      hub.receive('p-1', {
+        v: 1,
+        t: 'setSeat',
+        seat,
+        occupant: {
+          kind: 'bot',
+          persona: {
+            id: `bot-${seat}`,
+            name: `${seat}机器人`,
+            risk: 'normal',
+            system: 'precision',
+            conventions: [],
+            randomness: 0,
+          },
+        },
+      });
+    }
+    hub.receive('p-1', { v: 1, t: 'startMatch' });
+    expect(roomView(a).status).toBe('playing');
+
+    hub.receive('p-1', { v: 1, t: 'setAutoPlay', enabled: true });
+    expect(roomView(a).you.autoPlay).toBe(true);
+
+    hub.receive('p-1', { v: 1, t: 'setAutoPlay', enabled: false });
+    expect(roomView(a).you.autoPlay).toBeUndefined();
+  });
+
   it('未加入房间的动作返回 NOT_IN_ROOM；请求快照可重发', () => {
     const { hub } = setup();
     const a = connect(hub, 'p-1', 'Alice');

@@ -406,17 +406,17 @@ function toggleAutoPilot(): void {
 
 .pile-actions {
   display: flex;
-  gap: 4px;
+  gap: 5px;
 }
 .action-btn {
-  min-width: 50px;
-  padding: 3px 8px;
+  min-width: 54px;
+  padding: 4px 9px;
   border: 1px solid #f0d9b5;
   border-radius: 3px;
   background: linear-gradient(180deg, #b5471f, #8f3414);
   color: #fff3df;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
   cursor: pointer;

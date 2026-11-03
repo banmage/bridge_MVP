@@ -41,4 +41,29 @@ describe('OnlineChat 房间聊天', () => {
 
     expect(wrapper.emitted('send')).toBeUndefined();
   });
+
+  it('系统消息单独标记并以“系统”作为发送者', () => {
+    const messages: ChatMessage[] = [
+      ...makeMessages(),
+      { id: 's1', from: '系统', seat: null, text: '牌室已解散或不存在', at: 3, system: true },
+    ];
+    const wrapper = mount(OnlineChat, { props: { messages } });
+
+    const system = wrapper.get('.chat-line.system');
+    expect(system.get('strong').text()).toBe('系统');
+    expect(system.text()).toContain('牌室已解散或不存在');
+    expect(wrapper.findAll('.chat-line')).toHaveLength(3);
+  });
+
+  it('只读内联模式隐藏输入框，仍显示消息', () => {
+    const wrapper = mount(OnlineChat, {
+      props: { messages: makeMessages(), inline: true, readonly: true, title: '系统消息' },
+    });
+
+    expect(wrapper.classes()).toContain('inline');
+    expect(wrapper.classes()).toContain('readonly');
+    expect(wrapper.find('input').exists()).toBe(false);
+    expect(wrapper.get('.chat-head').text()).toContain('系统消息');
+    expect(wrapper.findAll('.chat-line')).toHaveLength(2);
+  });
 });

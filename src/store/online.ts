@@ -3,6 +3,7 @@ import {
   PROTOCOL_VERSION,
   type BidCall,
   type BotPersona,
+  type ChatMessage,
   type ErrorCode,
   type Position,
   type RoomConfigInput,
@@ -37,6 +38,8 @@ interface OnlineState {
   toasts: OnlineToast[];
   /** 本局内已完成副的完整快照（用于复盘） */
   records: Record<number, ReplayBoard>;
+  /** 本地系统提示（房间解散、连接异常等），与玩家聊天一起展示 */
+  systemMessages: ChatMessage[];
   bound: boolean;
 }
 
@@ -52,6 +55,7 @@ export const useOnlineStore = defineStore('online', {
     error: null,
     toasts: [],
     records: {},
+    systemMessages: [],
     bound: false,
   }),
 
@@ -76,6 +80,10 @@ export const useOnlineStore = defineStore('online', {
     },
     inProgress(state): boolean {
       return !!state.room && state.room.status !== 'finished';
+    },
+    /** 聊天面板展示：服务端聊天 + 本地系统提示（按时间合并） */
+    chatMessages(state): ChatMessage[] {
+      return [...state.systemMessages, ...(state.room?.chat ?? [])].sort((a, b) => a.at - b.at);
     },
   },
 
@@ -116,11 +124,13 @@ export const useOnlineStore = defineStore('online', {
 
     createRoom(config: RoomConfigInput, seat: Position): void {
       this.clearError();
+      this.clearSystemMessages();
       onlineSocket.send({ v: PROTOCOL_VERSION, t: 'createRoom', config, seat });
     },
 
     joinRoom(code: string, seat?: Position): void {
       this.clearError();
+      this.clearSystemMessages();
       onlineSocket.send({
         v: PROTOCOL_VERSION,
         t: 'joinRoom',
@@ -145,6 +155,11 @@ export const useOnlineStore = defineStore('online', {
 
     setConfig(config: RoomConfigInput): void {
       onlineSocket.send({ v: PROTOCOL_VERSION, t: 'setConfig', config });
+    },
+
+    /** 主动托管：保留自己的座位与手牌可见性，由 AI 代叫/代打 */
+    setAutoPlay(enabled: boolean): void {
+      onlineSocket.send({ v: PROTOCOL_VERSION, t: 'setAutoPlay', enabled });
     },
 
     startMatch(): void {
@@ -174,6 +189,25 @@ export const useOnlineStore = defineStore('online', {
 
     clearError(): void {
       this.error = null;
+    },
+
+    /** 写入一条本地系统消息，进入聊天列表并标记为系统消息 */
+    noteSystem(text: string): void {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const message: ChatMessage = {
+        id: `sys_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        at: Date.now(),
+        from: '系统',
+        seat: null,
+        text: trimmed,
+        system: true,
+      };
+      this.systemMessages = [...this.systemMessages.slice(-49), message];
+    },
+
+    clearSystemMessages(): void {
+      this.systemMessages = [];
     },
 
     dismissToast(id: number): void {
@@ -209,6 +243,7 @@ export const useOnlineStore = defineStore('online', {
             onlineSocket.close();
             this.connection = 'closed';
             this.error = { code: message.code, message: message.message, at: Date.now() };
+            this.noteSystem('该身份已在其他窗口连接，本窗口已断开');
             this.toasts = [
               ...this.toasts.slice(-4),
               {
@@ -222,10 +257,16 @@ export const useOnlineStore = defineStore('online', {
           if (message.code === 'ROOM_NOT_FOUND') {
             this.room = null;
             this.records = {};
+            // 房间已解散/不存在：错误同时写入聊天，避免只看顶部提示后找不到原因
+            this.noteSystem('牌室已解散或不存在');
           }
           // 比赛刚结束的瞬间，可能仍有基于旧快照的迟到动作；
           // 此时服务端已广播 finished，忽略对应的 WRONG_PHASE 提示，避免误导玩家。
           if (this.room?.status === 'finished' && message.code === 'WRONG_PHASE') return;
+          // 顶部错误提示容易错过，同步写入聊天并标记为系统消息
+          if (message.code !== 'ROOM_NOT_FOUND') {
+            this.noteSystem(message.message);
+          }
           this.error = { code: message.code, message: message.message, at: Date.now() };
           this.toasts = [
             ...this.toasts.slice(-4),
@@ -234,6 +275,8 @@ export const useOnlineStore = defineStore('online', {
           return;
         }
         case 'toast': {
+          // 服务端提示同样进入聊天，避免只在顶部短暂出现
+          this.noteSystem(message.message);
           this.toasts = [
             ...this.toasts.slice(-4),
             { id: Date.now() + Math.random(), message: message.message, level: message.level ?? 'info' },

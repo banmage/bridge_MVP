@@ -397,8 +397,8 @@ onBeforeUnmount(stopDrag);
 .bidding-popup {
   position: fixed;
   z-index: 4000;
-  width: 300px;
-  padding: 0 7px 7px;
+  width: 344px;
+  padding: 0 8px 8px;
   border: 1px solid #5f6c63;
   border-radius: 6px;
   background: #ededed;
@@ -418,17 +418,17 @@ onBeforeUnmount(stopDrag);
   border-radius: 5px 5px 0 0;
   background: linear-gradient(180deg, #1d6d49, #12482f);
   color: #eaf5ee;
-  font-size: 11px;
+  font-size: 12px;
   cursor: move;
   touch-action: none;
 }
 .popup-bar strong {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.04em;
 }
 .popup-bar span {
   color: rgba(234, 245, 238, 0.62);
-  font-size: 10px;
+  font-size: 11px;
 }
 .popup-bar.dragging {
   cursor: grabbing;
@@ -443,21 +443,21 @@ onBeforeUnmount(stopDrag);
 .bid-grid {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .level-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 2px;
+  gap: 3px;
 }
 .bid-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  height: 25px;
+  gap: 3px;
+  height: 31px;
   min-width: 0;
-  padding: 0 3px;
+  padding: 0 4px;
   border: 1px solid #858585;
   border-radius: 0;
   background: #ffff99;
@@ -466,7 +466,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -494,11 +494,11 @@ onBeforeUnmount(stopDrag);
   cursor: not-allowed;
 }
 .bid-level {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
 }
 .bid-suit {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
 }
@@ -506,7 +506,7 @@ onBeforeUnmount(stopDrag);
   color: #d00000;
 }
 .bid-suit.nt {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: -0.4px;
 }
 .bid-btn:disabled .bid-level,
@@ -515,15 +515,15 @@ onBeforeUnmount(stopDrag);
 }
 .bid-combo {
   width: 100%;
-  height: 24px;
-  margin: 3px 0 2px;
-  padding: 0 3px;
+  height: 28px;
+  margin: 4px 0 3px;
+  padding: 0 4px;
   border: 1px solid #7e7e7e;
   border-radius: 0;
   background: #fff;
   color: #000;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
 }
 .bid-combo:disabled {
   color: #8f8f8f;
@@ -532,10 +532,10 @@ onBeforeUnmount(stopDrag);
 .special-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
+  gap: 3px;
 }
 .special-btn {
-  height: 25px;
+  height: 31px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -546,7 +546,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -581,11 +581,11 @@ onBeforeUnmount(stopDrag);
 .confirm-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  margin-top: 2px;
+  gap: 3px;
+  margin-top: 3px;
 }
 .confirm-btn {
-  height: 25px;
+  height: 31px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -596,7 +596,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;

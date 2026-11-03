@@ -24,6 +24,7 @@
 | `status` | `'lobby' \| 'playing' \| 'finished'` | |
 | `config` | `MatchConfig` | 开赛后冻结 |
 | `seats` | `Record<Position, Seat>` | N/E/S/W |
+| `autoPlay` | `Partial<Record<Position, boolean>>` | 主动托管：座位仍是真人，由 AI 代叫/代打 |
 | `match` | `Match \| null` | |
 | `createdAt` / `updatedAt` | number | |
 
@@ -57,6 +58,10 @@ interface MatchConfig {
   scoring: 'mp' | 'hcp-points';
   matchId: string;
   seedBase: number;        // 用于派生每副 seed
+  systems?: {              // 每方统一叫牌体系，缺省精确
+    NS: 'precision' | 'natural';
+    EW: 'precision' | 'natural';
+  };
 }
 ```
 
@@ -123,7 +128,12 @@ interface RoomView {
   code: string;
   status: RoomStatus;
   hostId: string;
-  you: { playerId: string; name: string; seat: Position | null };
+  you: {
+    playerId: string;
+    name: string;
+    seat: Position | null;
+    autoPlay?: boolean;    // 本人主动托管中；仅本人可见
+  };
   config: MatchConfig;
   seats: Record<Position, SeatView>;   // 机器人人格公开；真人只暴露名字与在线状态
   board: BoardView | null;
@@ -131,6 +141,15 @@ interface RoomView {
   result: MatchResult;
   chat: ChatMessage[];                // 最近 50 条
   serverTime: number;
+}
+
+interface ChatMessage {
+  id: string;
+  at: number;
+  from: string;
+  seat: Position | null;
+  text: string;
+  system?: boolean;                   // 系统提示（房间解散、错误说明等）
 }
 
 interface BoardView {
@@ -164,6 +183,7 @@ interface BoardView {
 2. `dummyHand` 仅在 `dummyOpen` 为真时存在。
 3. `revealedHands` 仅在 `phase === 'scored'` 时存在，且四手各 13 张。
 4. `BoardView` 不含 `seed`；`RoomView` 不含他人 `playerId` 以外的敏感字段。
+5. `you.autoPlay` 只向本人投影；其他玩家无法看到别人的主动托管状态。
 
 ## 4. 成绩
 

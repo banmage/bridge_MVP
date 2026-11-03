@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
 import type { CardPlay, Position } from '../../models/gameState';
-import type { RoomView } from '@shared/protocol';
+import type { ChatMessage, RoomView } from '@shared/protocol';
 import type { BiddingRule, LeadRule } from '../../engine/types';
 import { loadLeadRules } from '../../engine/loader';
 import { describeContract, vulName } from '@shared/format';
@@ -30,11 +30,16 @@ const props = defineProps<{
   room: RoomView;
   /** 本桌叫牌规则资产（用于叫牌过程与叫牌卡的悬停解释） */
   biddingRules?: BiddingRule[] | null;
+  /** 每方叫牌规则：双方体系不同时按叫牌人所在方解释历史叫品 */
+  biddingRulesBySide?: Partial<Record<'NS' | 'EW', BiddingRule[]>> | null;
+  /** 聊天面板消息（服务端聊天 + 本地系统提示）；缺省使用房间聊天 */
+  messages?: ChatMessage[];
 }>();
 const emit = defineEmits<{
   (e: 'play', card: number): void;
   (e: 'score'): void;
   (e: 'chat-send', text: string): void;
+  (e: 'toggle-auto-play'): void;
 }>();
 
 /** 首攻规则只解析一次，供出牌推荐复用 */
@@ -421,6 +426,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :phase="board?.phase ?? 'play'"
         :current-bidder="board?.currentBidder ?? null"
         :bidding-rules="biddingRules ?? null"
+        :bidding-rules-by-side="biddingRulesBySide ?? null"
       />
     </aside>
 
@@ -466,6 +472,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         :phase="board?.phase ?? 'bidding'"
         :current-bidder="board?.currentBidder ?? null"
         :bidding-rules="biddingRules ?? null"
+        :bidding-rules-by-side="biddingRulesBySide ?? null"
       />
 
       <div v-else-if="board && cardsVisible" class="trick-board">
@@ -490,6 +497,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
       :cards-visible="cardsVisible"
       :your-seat="southSeat"
       @score="emit('score')"
+      @toggle-auto-play="emit('toggle-auto-play')"
     />
 
     <!-- 右手方（相对视角） -->
@@ -553,11 +561,12 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
         <span class="seat-name">{{ seatLabel(southSeat) }}</span>
         <span v-if="occupantTag(southSeat)" class="seat-tag">{{ occupantTag(southSeat) }}</span>
         <span v-if="isDummySeat(southSeat)" class="dummy-tag">明手</span>
+        <span v-if="room.you.autoPlay" class="auto-tag">托管中</span>
       </div>
     </div>
 
     <!-- 左下方：常驻聊天，可滚动 -->
-    <OnlineChat :messages="room.chat" @send="emit('chat-send', $event)" />
+    <OnlineChat :messages="messages ?? room.chat" @send="emit('chat-send', $event)" />
   </div>
 </template>
 
@@ -570,9 +579,9 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
     'north north north'
     'west center east'
     'south south south';
-  grid-template-columns: minmax(0, 1fr) clamp(310px, 24vw, 370px) minmax(0, 1fr);
-  grid-template-rows: auto minmax(250px, 1fr) auto;
-  gap: 4px 8px;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 330px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(230px, 1fr) auto;
+  gap: 4px 6px;
   min-height: calc(100vh - 92px);
   overflow: hidden;
   background:
@@ -664,6 +673,16 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   font-weight: 700;
   text-shadow: none;
 }
+/* 主动托管：提醒本人当前由 AI 代打，座位与手牌仍归本人 */
+.auto-tag {
+  background: #2f8f5b;
+  color: #f4fff8;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-shadow: none;
+}
 .seat.active .seat-profile {
   color: #ffe19a;
   text-shadow:
@@ -678,8 +697,26 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   flex-direction: column;
   gap: 4px;
   width: 100%;
-  max-width: 380px;
+  max-width: 340px;
   min-height: 0;
+}
+/* 手牌在联网牌桌上略微放大，中央空白区域收紧后仍给四家留出完整宽度 */
+.online-table .seat :deep(.hand) {
+  --card-overlap: -74px;
+}
+.online-table .seat :deep(.size-xxl) {
+  --pc-label-size: 23px;
+  --pc-corner-size: 19px;
+  --pc-pip-size: 23px;
+  --pc-court-size: 58px;
+  --pc-back-spade-size: 38px;
+  width: 106px;
+  height: 148px;
+  border-radius: 11px;
+}
+.online-table .seat :deep(.hand-row),
+.online-table .seat :deep(.cards.backs) {
+  min-height: 148px;
 }
 /* 左右两块信息与北家手牌上沿平齐：左侧牌局信息，右侧叫牌过程 */
 .play-info-panel,
@@ -873,12 +910,27 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   bottom: -6px;
   left: -6px;
 }
+@media (max-width: 1350px) {
+  .online-table .seat :deep(.hand) {
+    --card-overlap: -78px;
+  }
+}
+@media (max-width: 1200px) {
+  .online-table .seat :deep(.hand) {
+    --card-overlap: -84px;
+  }
+}
+@media (max-width: 1000px) {
+  .online-table .seat :deep(.hand) {
+    --card-overlap: -90px;
+  }
+}
 @media (max-width: 900px) {
   .table {
     --table-pad: 8px;
-    grid-template-columns: minmax(0, 1fr) 320px minmax(0, 1fr);
-    grid-template-rows: auto minmax(250px, 1fr) auto;
-    min-height: 560px;
+    grid-template-columns: minmax(0, 1fr) 300px minmax(0, 1fr);
+    grid-template-rows: auto minmax(230px, 1fr) auto;
+    min-height: 590px;
     padding: var(--table-pad);
     gap: 4px;
   }
@@ -886,7 +938,10 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
     min-height: 252px;
   }
   .center {
-    max-width: 320px;
+    max-width: 300px;
+  }
+  .online-table .seat :deep(.hand) {
+    --card-overlap: -94px;
   }
   .center-bid-history {
     max-height: 210px;
@@ -914,6 +969,9 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   .center {
     width: min(100%, 340px);
     max-width: 340px;
+  }
+  .online-table .seat :deep(.hand) {
+    --card-overlap: -76px;
   }
   .play-info-panel,
   .play-bid-history {

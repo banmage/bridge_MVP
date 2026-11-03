@@ -15,7 +15,10 @@ import HandDiagram from '../HandDiagram.vue';
  */
 
 const props = defineProps<{ room: RoomView; cardsVisible: boolean; yourSeat: Position }>();
-const emit = defineEmits<{ (e: 'score'): void }>();
+const emit = defineEmits<{ (e: 'score'): void; (e: 'toggle-auto-play'): void }>();
+
+/** 当前是否由 AI 托管自己的座位 */
+const autoPlaying = computed(() => !!props.room.you.autoPlay);
 
 const SEAT_LABEL: Record<Position, string> = { N: '北 N', E: '东 E', S: '南 S', W: '西 W' };
 const COLUMNS: Position[] = ['N', 'E', 'S', 'W'];
@@ -198,6 +201,16 @@ const declarerTricksWon = computed(() => {
 
     <!-- 已出牌下方的四个常用按钮，与单机版一致 -->
     <div class="pile-actions">
+      <button
+        type="button"
+        class="action-btn auto-play-btn"
+        :class="{ active: autoPlaying }"
+        :aria-pressed="autoPlaying"
+        :title="autoPlaying ? '取消后恢复手动叫牌与出牌' : '交给 AI 代你叫牌与出牌，座位和手牌仍保留'"
+        @click="emit('toggle-auto-play')"
+      >
+        {{ autoPlaying ? '解除托管' : '托管' }}
+      </button>
       <button type="button" class="action-btn" @click="emit('score')">计分表</button>
       <button type="button" class="action-btn" @click="exposeVisible = true">摊牌</button>
       <button type="button" class="action-btn" @click="contractVisible = true">定约卡</button>
@@ -422,17 +435,17 @@ const declarerTricksWon = computed(() => {
 
 .pile-actions {
   display: flex;
-  gap: 4px;
+  gap: 5px;
 }
 .action-btn {
-  min-width: 50px;
-  padding: 3px 8px;
+  min-width: 54px;
+  padding: 4px 9px;
   border: 1px solid #f0d9b5;
   border-radius: 3px;
   background: linear-gradient(180deg, #b5471f, #8f3414);
   color: #fff3df;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
   cursor: pointer;
@@ -440,6 +453,15 @@ const declarerTricksWon = computed(() => {
 }
 .action-btn:hover {
   background: linear-gradient(180deg, #c9542a, #a03c18);
+}
+/* 托管中：按钮保持醒目的绿色，提示当前由 AI 代打 */
+.action-btn.auto-play-btn.active {
+  border-color: #b8f0c9;
+  background: linear-gradient(180deg, #2f8f5b, #1f6b42);
+  color: #f4fff8;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .expose-grid {

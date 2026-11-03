@@ -315,6 +315,55 @@ describe('座位配置与开赛校验', () => {
     expect(room.match).not.toBeNull();
     expect(room.match!.board!.index).toBe(1);
   });
+
+  it('主动托管保留真人座位，解除后恢复手动', () => {
+    const { m, room } = newRoom();
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+
+    m.setAutoPlay('p-host', 'ABC123', true);
+    expect(room.seats.S.kind).toBe('human');
+    expect(room.autoPlay.S).toBe(true);
+    expect(room.match!.autoPlay.S).toBe(true);
+
+    m.setAutoPlay('p-host', 'ABC123', false);
+    expect(room.autoPlay.S).toBeUndefined();
+    expect(room.match!.autoPlay.S).toBeUndefined();
+    expect(room.seats.S.kind).toBe('human');
+  });
+
+  it('未开赛或非本人座位不能主动托管', () => {
+    const { m } = newRoom();
+    expect(() => m.setAutoPlay('p-host', 'ABC123', true)).toThrow(/未在进行中/);
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+    expect(() => m.setAutoPlay('p-other', 'ABC123', true)).toThrow(/不在该房间/);
+  });
+
+  it('同方机器人叫牌体系自动同步，默认精确', () => {
+    const { m, room } = newRoom();
+    expect(room.config.systems).toEqual({ NS: 'precision', EW: 'precision' });
+
+    // 先给西家设定精确，再给东家设定自然：东西方统一为自然
+    m.setSeat('p-host', 'ABC123', 'W', { kind: 'bot', persona: { ...BOT, system: 'precision' } });
+    m.setSeat('p-host', 'ABC123', 'E', { kind: 'bot', persona: { ...BOT, system: 'natural' } });
+    expect(room.config.systems?.EW).toBe('natural');
+    expect(room.seats.W.kind).toBe('bot');
+    if (room.seats.W.kind === 'bot') expect(room.seats.W.persona.system).toBe('natural');
+
+    // 反向：修改西家为精确，东家也跟随
+    m.updateBot('p-host', 'ABC123', 'W', { ...BOT, id: 'bot-w', system: 'precision' });
+    expect(room.config.systems?.EW).toBe('precision');
+    if (room.seats.E.kind === 'bot') expect(room.seats.E.persona.system).toBe('precision');
+
+    // 南北方的机器人同样同步，开赛后引擎使用该方体系
+    m.setSeat('p-host', 'ABC123', 'N', { kind: 'bot', persona: { ...BOT, system: 'natural' } });
+    expect(room.config.systems?.NS).toBe('natural');
+    fillWithBots(m);
+    m.startMatch('p-host', 'ABC123');
+    expect(room.match!.systemForSide('NS')).toBe('natural');
+    expect(room.match!.systemForSide('EW')).toBe('precision');
+  });
 });
 
 describe('对局动作与推进', () => {
@@ -334,8 +383,9 @@ describe('对局动作与推进', () => {
     let guard = 0;
     while (engine.board!.phase !== 'scored' && guard < 400) {
       const board = engine.board!;
-      if (engine.pendingBotSeat()) {
-        engine.runAiStep();
+      if (engine.pendingBotSeat() || engine.pendingForcedSeat()) {
+        // 机器人座位与「唯一合法牌」都由调度器推进
+        engine.runAutoStep();
       } else if (engine.canPlayerAct('p-host')) {
         if (board.phase === 'bidding') {
           engine.submitBid('p-host', { type: 'pass' });

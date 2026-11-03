@@ -336,3 +336,70 @@ describe('座位接管', () => {
     expect(engine.seats.N.persona?.name).toBe('接管');
   });
 });
+
+describe('主动托管与唯一合法出牌', () => {
+  /** E 首攻红桃，明手 S 只有一张红桃，形成唯一合法出牌 */
+  function forcedPlayHands(): Record<Position, Hand> {
+    return {
+      N: [...Array.from({ length: 12 }, (_, i) => 1 + i), 38],
+      E: [0, 13, ...Array.from({ length: 11 }, (_, i) => 15 + i)],
+      S: [14, ...Array.from({ length: 12 }, (_, i) => 26 + i)],
+      W: Array.from({ length: 13 }, (_, i) => 39 + i),
+    };
+  }
+
+  it('主动托管让真人座位由 AI 代叫，解除后恢复手动', () => {
+    const engine = createEngine();
+    engine.startBoard(1, { hands: fixedHands() });
+    expect(engine.pendingBotSeat()).toBeNull();
+    expect(engine.canPlayerAct('p-N')).toBe(true);
+
+    engine.setAutoPlay('N', true);
+    expect(engine.seats.N.kind).toBe('human');
+    expect(engine.pendingBotSeat()).toBe('N');
+    expect(engine.canPlayerAct('p-N')).toBe(false);
+
+    const step = engine.runAutoStep();
+    expect(step).toMatchObject({ seat: 'N', action: 'bid' });
+
+    engine.setAutoPlay('N', false);
+    expect(engine.pendingBotSeat()).toBeNull();
+    expect(engine.canPlayerAct('p-E')).toBe(true);
+  });
+
+  it('只有唯一合法出牌时自动打出，不等待真人确认', () => {
+    const engine = createEngine();
+    engine.startBoard(1, { hands: forcedPlayHands() });
+    bidSevenNoTrump(engine);
+
+    engine.submitPlay('p-E', 13);
+    expect(engine.board!.nextPlayer).toBe('S');
+    expect(engine.pendingForcedSeat()).toBe('S');
+    // 明手 S 由庄家 N 控制；唯一合法牌不应再等待 N 点击
+    expect(engine.canPlayerAct('p-N')).toBe(false);
+
+    const step = engine.runAutoStep();
+    expect(step).toMatchObject({ seat: 'S', action: 'play' });
+    expect(engine.board!.currentTrick).toHaveLength(2);
+    expect(engine.board!.currentTrick[1].card).toBe(14);
+  });
+
+  it('每方叫牌体系默认精确，并按配置返回', () => {
+    const engine = createEngine();
+    expect(engine.systemForSide('NS')).toBe('precision');
+    expect(engine.systemForSide('EW')).toBe('precision');
+
+    const configured = new MatchEngine({
+      config: {
+        boards: 12,
+        scoring: 'hcp-points',
+        seedBase: 1,
+        matchId: 'm-systems',
+        systems: { NS: 'natural', EW: 'precision' },
+      },
+      seats: humanSeats(),
+    });
+    expect(configured.systemForSide('NS')).toBe('natural');
+    expect(configured.systemForSide('EW')).toBe('precision');
+  });
+});

@@ -97,12 +97,12 @@ function clearHint(): void {
               @mouseenter="hoverCard(card)"
               @mouseleave="clearHint"
             >
-              <span
+              <TurnArrow
                 v-if="recommendedCard === card"
-                class="play-hint-arrow"
-                role="img"
-                aria-label="推荐出牌"
-              >▼</span>
+                variant="card"
+                :position="arrowPosition"
+                label="推荐出牌"
+              />
               <PlayingCard
                 :card="card"
                 size="xxl"
@@ -169,34 +169,9 @@ function clearHint(): void {
 .suit-group .card-slot + .card-slot {
   margin-left: var(--card-overlap);
 }
-/* 推荐出牌：牌张留在原位，只有闪烁箭头指向它 */
-.play-hint-arrow {
-  position: absolute;
-  top: 1px;
-  left: 50%;
+/* 推荐出牌的箭头由 TurnArrow 渲染在 .card-slot 内，牌张本身保持原位 */
+.card-slot :deep(.turn-arrow) {
   z-index: 30;
-  color: #ff9d1f;
-  font-size: 22px;
-  font-weight: 900;
-  line-height: 1;
-  text-shadow:
-    0 1px 0 #fff,
-    0 0 7px rgba(255, 145, 15, 0.95);
-  transform: translateX(-50%);
-  animation: play-hint-blink 0.8s step-end infinite;
-  pointer-events: none;
-}
-@keyframes play-hint-blink {
-  0%,
-  49.9% {
-    color: #ff9d1f;
-    opacity: 1;
-  }
-  50%,
-  100% {
-    color: #ffffff;
-    opacity: 0.72;
-  }
 }
 .suits.no-events {
   pointer-events: none;

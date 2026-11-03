@@ -28,12 +28,13 @@
 |-----|------|------|
 | `hello` | `playerId,name,token` | 身份握手 |
 | `setName` | `name` | 修改昵称 |
-| `createRoom` | `config:{boards,scoring}, seat:Position` | 创建房间并坐入指定座位 |
+| `createRoom` | `config:{boards,scoring,systems?}, seat:Position` | 创建房间并坐入指定座位；`systems` 缺省为精确 |
 | `joinRoom` | `code, seat?:Position` | 加入房间（座位可省略=自动选空位） |
 | `leaveRoom` | — | 离开房间（开赛后触发机器人接管） |
-| `setSeat` | `seat, occupant:{kind:'open'|'human'|'bot', persona?}` | 房主在 lobby 阶段配置座位 |
-| `updateBot` | `seat, persona` | 房主修改机器人人格（lobby） |
-| `setConfig` | `config:{boards,scoring}` | 房主修改配置（lobby） |
+| `setSeat` | `seat, occupant:{kind:'open'|'human'|'bot', persona?}` | 房主在 lobby 阶段配置座位；设置机器人体系会同步同方同伴 |
+| `updateBot` | `seat, persona` | 房主修改机器人人格（lobby）；体系按方同步 |
+| `setConfig` | `config:{boards,scoring,systems?}` | 房主修改配置（lobby）；`systems` 为 `{NS,EW}` |
+| `setAutoPlay` | `enabled:boolean` | 主动托管/解除自己的真人座位（仅对局中） |
 | `startMatch` | — | 房主开赛（要求 4 座占满） |
 | `bid` | `call:BidCall, alert?:{text}` | 提交叫牌（仅自己座位） |
 | `play` | `card:number` | 提交出牌（庄家可代打明手） |
@@ -46,7 +47,7 @@
 | `t` | 字段 | 说明 |
 |-----|------|------|
 | `hello` | `playerId,name` | 握手成功 |
-| `room` | `room:RoomView` | **全量视角快照**（每次状态变更后推送） |
+| `room` | `room:RoomView` | **全量视角快照**（每次状态变更后推送）；`you.autoPlay` 仅向本人暴露，`chat[].system` 标记系统消息 |
 | `error` | `code,message` | 可读错误；`code` 见下表 |
 | `toast` | `message,level?` | 非阻断提示（如「XX 已接管」） |
 
@@ -94,7 +95,17 @@
 ← { "v":1, "t":"error", "code":"NOT_YOUR_TURN", "message":"当前轮到 W 叫牌" }
 ```
 
-### 4.4 快照中的牌桌
+### 4.4 主动托管
+
+```json
+→ { "v":1, "t":"setAutoPlay", "enabled":true }
+← { "v":1, "t":"room", "room":{ ..., "you":{ "playerId":"...", "name":"Alice", "seat":"S", "autoPlay":true }, ... } }
+```
+
+- 托管只改变控制权，座位仍是真人，手牌可见性不变；再次发送 `enabled:false` 即解除。
+- 唯一合法出牌由服务端自动打出，不经过 `play` 报文，真人无需等待点击。
+
+### 4.5 快照中的牌桌
 
 ```json
 { "v":1, "t":"room", "room":{ ..., "board":{ "index":1, "dealer":"N", "vulnerability":"none", "phase":"play", "currentBidder":"W", "nextPlayer":"E", "contract":{"level":3,"suit":"NT","doubled":false,"redoubled":false,"declarer":"S","dummy":"N"}, "bidding":[...], "tricks":[...], "currentTrick":[{"position":"S","card":51}], "yourSeat":"S", "yourHand":[12,25,...], "dummySeat":"N", "dummyHand":[3,7,...], "dummyOpen":true, "revealedHands":null, "canAct":false, "actingForSeat":null, "message":"E 出牌" } } }

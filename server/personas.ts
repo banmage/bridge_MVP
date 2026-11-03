@@ -76,9 +76,13 @@ export function botBid(
   return { call: picked.call };
 }
 
-/** 生成默认人格（用于「真人离开 → 机器人接管」） */
-export function defaultPersonaFor(playerName: string, id: string): BotPersona {
-  return { ...DEFAULT_PERSONA, id, name: playerName || '托管机器人', randomness: 0 };
+/** 生成默认人格（用于「真人离开 → 机器人接管」或主动托管） */
+export function defaultPersonaFor(
+  playerName: string,
+  id: string,
+  system: BotPersona['system'] = 'precision',
+): BotPersona {
+  return { ...DEFAULT_PERSONA, id, name: playerName || '托管机器人', system, randomness: 0 };
 }
 
 /** 校验人格字段（服务端入口处调用） */

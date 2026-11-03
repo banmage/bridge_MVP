@@ -10,7 +10,13 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Position } from '../src/models/gameState';
-import { isBoardCount, isScoringMode, type MatchConfig, type RoomStatus } from '../shared/protocol';
+import {
+  isBiddingSystem,
+  isBoardCount,
+  isScoringMode,
+  type MatchConfig,
+  type RoomStatus,
+} from '../shared/protocol';
 import {
   MatchEngine,
   type MatchEngineSnapshot,
@@ -38,6 +44,8 @@ export interface RoomSnapshot {
     status: RoomStatus;
     config: MatchConfig;
     seats: Room['seats'];
+    /** 主动托管记录（旧快照可能没有） */
+    autoPlay?: Room['autoPlay'];
     chat: Room['chat'];
     joinOrder: string[];
     /** 超时托管记录（旧快照可能没有） */
@@ -108,13 +116,26 @@ function isSeat(value: unknown): boolean {
 }
 
 function isConfig(value: unknown): value is MatchConfig {
+  if (
+    !isObject(value) ||
+    !isBoardCount(value.boards) ||
+    !isScoringMode(value.scoring) ||
+    !isNumber(value.seedBase) ||
+    typeof value.matchId !== 'string'
+  ) {
+    return false;
+  }
+  if (value.systems === undefined) return true;
   return (
-    isObject(value) &&
-    isBoardCount(value.boards) &&
-    isScoringMode(value.scoring) &&
-    isNumber(value.seedBase) &&
-    typeof value.matchId === 'string'
+    isObject(value.systems) &&
+    isBiddingSystem(value.systems.NS) &&
+    isBiddingSystem(value.systems.EW)
   );
+}
+
+function isAutoPlayMap(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return POSITIONS.every((pos) => value[pos] === undefined || value[pos] === true || value[pos] === false);
 }
 
 function isSeatMap(value: unknown): boolean {
@@ -178,6 +199,7 @@ function isMatchSnapshot(value: unknown): value is MatchEngineSnapshot {
     isObject(value) &&
     isConfig(value.config) &&
     isEngineSeatMap(value.seats) &&
+    (value.autoPlay === undefined || isAutoPlayMap(value.autoPlay)) &&
     (value.board === null || isBoardState(value.board)) &&
     Array.isArray(value.completed) &&
     (value.status === 'idle' || value.status === 'playing' || value.status === 'finished') &&
@@ -201,6 +223,7 @@ function assertSnapshot(value: unknown): asserts value is RoomSnapshot {
   }
   if (!isConfig(room.config)) throw new Error('房间配置非法');
   if (!isSeatMap(room.seats)) throw new Error('房间座位非法');
+  if (room.autoPlay !== undefined && !isAutoPlayMap(room.autoPlay)) throw new Error('主动托管记录非法');
   if (room.takeovers !== undefined && !isTakeoverMap(room.takeovers)) throw new Error('托管记录非法');
   if (!Array.isArray(room.chat) || !Array.isArray(room.joinOrder)) throw new Error('房间聊天/加入顺序非法');
   if (!room.joinOrder.every((id) => typeof id === 'string')) throw new Error('加入顺序非法');
@@ -219,6 +242,7 @@ export function snapshotRoom(room: Room): RoomSnapshot {
       status: room.status,
       config: clone(room.config),
       seats: clone(room.seats),
+      autoPlay: clone(room.autoPlay ?? {}),
       chat: room.chat.map((message) => ({ ...message })),
       joinOrder: [...room.joinOrder],
       takeovers: clone(room.takeovers ?? {}),
@@ -245,6 +269,7 @@ export function roomFromSnapshot(snapshot: RoomSnapshot, opts: RestoreRoomOption
     status: snapshot.room.status,
     config: clone(snapshot.room.config),
     seats: clone(snapshot.room.seats),
+    autoPlay: clone(snapshot.room.autoPlay ?? {}),
     match,
     chat: snapshot.room.chat.map((message) => ({ ...message })),
     joinOrder: [...snapshot.room.joinOrder],
