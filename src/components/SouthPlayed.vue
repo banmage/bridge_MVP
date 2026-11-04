@@ -46,7 +46,7 @@ interface PileItem {
 }
 
 /** 每张牌叠放的水平步进：越小越紧凑 */
-const PILE_STEP = 13;
+const PILE_STEP = 16;
 
 const pileItems = computed<PileItem[]>(() => {
   const items: PileItem[] = [];
@@ -56,7 +56,7 @@ const pileItems = computed<PileItem[]>(() => {
     if (!play) return;
     const won = getSide(trick.winner) === 'NS';
     const flat = !won;
-    const width = flat ? 48 : 34;
+    const width = flat ? 60 : 42;
     items.push({
       key: `${index}-${play.card}`,
       card: play.card,
@@ -74,7 +74,7 @@ const pileItems = computed<PileItem[]>(() => {
 
 const pileWidth = computed(() => {
   const last = pileItems.value[pileItems.value.length - 1];
-  return last ? last.left + last.width : 34;
+  return last ? last.left + last.width : 42;
 });
 
 /** 上一墩（鼠标悬停时回放其出牌顺序） */
@@ -250,21 +250,25 @@ function toggleAutoPilot(): void {
 }
 .pile {
   position: relative;
-  height: 48px;
-  min-width: 34px;
+  height: 60px;
+  min-width: 42px;
 }
 .pile-card {
   position: absolute;
   bottom: 0;
   display: block;
-  width: 34px;
-  height: 48px;
+  width: 42px;
+  height: 60px;
   line-height: 0;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.32));
 }
 .pile-card.flat {
-  width: 48px;
-  height: 34px;
+  width: 60px;
+  height: 42px;
+}
+.pile-card :deep(.playing-card) {
+  width: 100%;
+  height: 100%;
 }
 .pile-card-inner {
   display: flex;
@@ -278,11 +282,11 @@ function toggleAutoPilot(): void {
 }
 .pile-empty {
   position: absolute;
-  bottom: 12px;
+  bottom: 18px;
   left: 0;
   white-space: nowrap;
   color: rgba(234, 245, 238, 0.5);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* 悬停浮层：上一墩按出牌顺序出现 */
@@ -409,14 +413,14 @@ function toggleAutoPilot(): void {
   gap: 5px;
 }
 .action-btn {
-  min-width: 54px;
-  padding: 4px 9px;
+  min-width: 60px;
+  padding: 5px 10px;
   border: 1px solid #f0d9b5;
   border-radius: 3px;
   background: linear-gradient(180deg, #b5471f, #8f3414);
   color: #fff3df;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
   cursor: pointer;

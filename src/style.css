@@ -80,7 +80,7 @@ body {
 }
 
 .app-header h1 {
-  font-size: 15px;
+  font-size: 17px;
   margin: 0;
   letter-spacing: 0.5px;
   white-space: nowrap;
@@ -90,11 +90,11 @@ body {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 13px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 7px;
-  padding: 3px 8px;
+  padding: 4px 9px;
   color: rgba(234, 245, 238, 0.9);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -105,11 +105,11 @@ body {
 
 .app-header .el-button {
   flex: none;
-  height: 25px;
+  height: 29px;
   margin-left: 0;
-  padding: 0 9px;
+  padding: 0 11px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 

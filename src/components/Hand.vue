@@ -125,14 +125,53 @@ function clearHint(): void {
 
 <style scoped>
 .hand {
-  /* 四家使用完全相同的牌面尺寸与叠放间距 */
-  --card-overlap: -66px;
+  /* 四家使用完全相同的牌面尺寸与叠放间距。
+     牌面尺寸随窗口宽度分级放大，叠放步进同步调整，
+     保证 13 张牌始终能放进左右两侧的列宽而不压到中央区域。 */
+  --hand-card-w: 108px;
+  --hand-card-h: 150px;
+  --hand-card-step: 32px;
+  --hand-card-radius: 11px;
+  --hand-label-size: 27px;
+  --hand-corner-size: 21px;
+  --hand-pip-size: 24px;
+  --hand-court-size: 60px;
+  --hand-back-spade-size: 40px;
+  --card-overlap: calc(var(--hand-card-step) - var(--hand-card-w));
   position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
   min-width: 0;
   max-width: 100%;
+}
+/* 手牌专用放大：中央出牌区仍使用 PlayingCard 自身的 xxl 尺寸 */
+.hand :deep(.size-xxl) {
+  --pc-label-size: var(--hand-label-size);
+  --pc-corner-size: var(--hand-corner-size);
+  --pc-pip-size: var(--hand-pip-size);
+  --pc-court-size: var(--hand-court-size);
+  --pc-back-spade-size: var(--hand-back-spade-size);
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+  border-radius: var(--hand-card-radius);
+}
+/* 叠牌时只露出左侧一条，角标尽量贴近边缘以放大可用字号 */
+.hand :deep(.pc-label:not(.pc-label-bottom)) {
+  top: 3px;
+  left: 3px;
+}
+.hand :deep(.pc-corner-suit:not(.pc-corner-suit-bottom)) {
+  top: calc(3px + var(--pc-label-size) + 1px);
+  left: 3px;
+}
+.hand :deep(.pc-label-bottom) {
+  right: 3px;
+  bottom: 3px;
+}
+.hand :deep(.pc-corner-suit-bottom) {
+  right: 3px;
+  bottom: calc(3px + var(--pc-label-size) + 1px);
 }
 .hand-inner {
   display: flex;
@@ -148,7 +187,7 @@ function clearHint(): void {
 .hand-row {
   display: flex;
   align-items: flex-end;
-  min-height: 134px;
+  min-height: var(--hand-card-h);
   padding-left: 2px;
   max-width: 100%;
 }
@@ -188,68 +227,207 @@ function clearHint(): void {
 .cards.backs {
   display: flex;
   align-items: center;
-  min-height: 134px;
+  min-height: var(--hand-card-h);
   padding-left: 2px;
 }
 .cards.backs .playing-card + .playing-card {
   margin-left: var(--card-overlap);
 }
 
-/* 全宽牌桌下，窄屏时逐步收紧叠放，仍保持四家一致 */
-@media (max-width: 1350px) {
+/* 宽屏继续放大牌面：左右两侧列宽增加后，把空间全部留给手牌 */
+@media (min-width: 1600px) {
   .hand {
-    --card-overlap: -67px;
+    --hand-card-w: 116px;
+    --hand-card-h: 162px;
+    --hand-card-step: 35px;
+    --hand-card-radius: 12px;
+    --hand-label-size: 29px;
+    --hand-corner-size: 23px;
+    --hand-pip-size: 26px;
+    --hand-court-size: 64px;
+    --hand-back-spade-size: 43px;
   }
 }
-@media (max-width: 1280px) {
+@media (min-width: 1800px) {
   .hand {
-    --card-overlap: -70px;
+    --hand-card-w: 128px;
+    --hand-card-h: 178px;
+    --hand-card-step: 41px;
+    --hand-card-radius: 13px;
+    --hand-label-size: 32px;
+    --hand-corner-size: 25px;
+    --hand-pip-size: 28px;
+    --hand-court-size: 70px;
+    --hand-back-spade-size: 47px;
   }
 }
-@media (max-width: 1200px) {
+@media (min-width: 1900px) {
   .hand {
-    --card-overlap: -72px;
+    --hand-card-w: 136px;
+    --hand-card-h: 190px;
+    --hand-card-step: 46px;
+    --hand-card-radius: 14px;
+    --hand-label-size: 34px;
+    --hand-corner-size: 26px;
+    --hand-pip-size: 30px;
+    --hand-court-size: 74px;
+    --hand-back-spade-size: 50px;
   }
 }
-@media (max-width: 1150px) {
+@media (min-width: 2100px) {
   .hand {
-    --card-overlap: -74px;
+    --hand-card-w: 148px;
+    --hand-card-h: 206px;
+    --hand-card-step: 52px;
+    --hand-card-radius: 15px;
+    --hand-label-size: 37px;
+    --hand-corner-size: 28px;
+    --hand-pip-size: 33px;
+    --hand-court-size: 81px;
+    --hand-back-spade-size: 54px;
   }
 }
-@media (max-width: 1100px) {
+/* 全宽牌桌下，窄屏时逐步收紧叠放，仍保持四家一致；
+   牌面尺寸同步缩小，尽量把露出的角标留给字符。 */
+@media (max-width: 1419px) {
   .hand {
-    --card-overlap: -77px;
+    --hand-card-w: 104px;
+    --hand-card-h: 146px;
+    --hand-card-step: 29px;
+    --hand-card-radius: 10px;
+    --hand-label-size: 26px;
+    --hand-corner-size: 20px;
+    --hand-pip-size: 23px;
+    --hand-court-size: 58px;
+    --hand-back-spade-size: 38px;
   }
 }
-@media (max-width: 1000px) {
+@media (max-width: 1349px) {
   .hand {
-    --card-overlap: -80px;
+    --hand-card-w: 102px;
+    --hand-card-h: 143px;
+    --hand-card-step: 28px;
+    --hand-card-radius: 10px;
+    --hand-label-size: 25px;
+    --hand-corner-size: 20px;
+    --hand-pip-size: 22px;
+    --hand-court-size: 57px;
+    --hand-back-spade-size: 37px;
   }
 }
-@media (max-width: 960px) {
+@media (max-width: 1299px) {
   .hand {
-    --card-overlap: -82px;
+    --hand-card-w: 100px;
+    --hand-card-h: 140px;
+    --hand-card-step: 27px;
+    --hand-card-radius: 10px;
+    --hand-label-size: 24px;
+    --hand-corner-size: 19px;
+    --hand-pip-size: 22px;
+    --hand-court-size: 56px;
+    --hand-back-spade-size: 37px;
   }
 }
-/* 单列布局后拥有整行宽度，恢复舒展牌距 */
+@media (max-width: 1249px) {
+  .hand {
+    --hand-card-w: 96px;
+    --hand-card-h: 134px;
+    --hand-card-step: 24px;
+    --hand-card-radius: 9px;
+    --hand-label-size: 22px;
+    --hand-corner-size: 18px;
+    --hand-pip-size: 21px;
+    --hand-court-size: 53px;
+    --hand-back-spade-size: 35px;
+  }
+}
+@media (max-width: 1199px) {
+  .hand {
+    --hand-card-w: 94px;
+    --hand-card-h: 131px;
+    --hand-card-step: 20px;
+    --hand-card-radius: 9px;
+    --hand-label-size: 17px;
+    --hand-corner-size: 16px;
+    --hand-pip-size: 21px;
+    --hand-court-size: 52px;
+    --hand-back-spade-size: 34px;
+  }
+}
+@media (max-width: 1099px) {
+  .hand {
+    --hand-card-w: 88px;
+    --hand-card-h: 123px;
+    --hand-card-step: 18px;
+    --hand-card-radius: 8px;
+    --hand-label-size: 15px;
+    --hand-corner-size: 14px;
+    --hand-pip-size: 19px;
+    --hand-court-size: 48px;
+    --hand-back-spade-size: 31px;
+  }
+}
+@media (max-width: 999px) {
+  .hand {
+    --hand-card-w: 84px;
+    --hand-card-h: 117px;
+    --hand-card-step: 15px;
+    --hand-card-radius: 8px;
+    --hand-label-size: 12px;
+    --hand-corner-size: 12px;
+    --hand-pip-size: 17px;
+    --hand-court-size: 44px;
+    --hand-back-spade-size: 28px;
+  }
+}
+/* 单列布局后拥有整行宽度，恢复舒展牌距并放大牌面 */
 @media (max-width: 880px) {
   .hand {
-    --card-overlap: -60px;
+    --hand-card-w: 108px;
+    --hand-card-h: 150px;
+    --hand-card-step: 38px;
+    --hand-card-radius: 11px;
+    --hand-label-size: 27px;
+    --hand-corner-size: 21px;
+    --hand-pip-size: 24px;
+    --hand-court-size: 60px;
+    --hand-back-spade-size: 40px;
+  }
+}
+@media (max-width: 700px) {
+  .hand {
+    --hand-card-w: 104px;
+    --hand-card-h: 146px;
+    --hand-card-step: 34px;
+    --hand-label-size: 26px;
+    --hand-corner-size: 20px;
   }
 }
 @media (max-width: 600px) {
   .hand {
-    --card-overlap: -70px;
+    --hand-card-w: 100px;
+    --hand-card-h: 140px;
+    --hand-card-step: 30px;
+    --hand-label-size: 24px;
+    --hand-corner-size: 19px;
   }
 }
 @media (max-width: 480px) {
   .hand {
-    --card-overlap: -76px;
+    --hand-card-w: 96px;
+    --hand-card-h: 134px;
+    --hand-card-step: 26px;
+    --hand-label-size: 22px;
+    --hand-corner-size: 18px;
   }
 }
 @media (max-width: 400px) {
   .hand {
-    --card-overlap: -82px;
+    --hand-card-w: 92px;
+    --hand-card-h: 128px;
+    --hand-card-step: 22px;
+    --hand-label-size: 20px;
+    --hand-corner-size: 16px;
   }
 }
 

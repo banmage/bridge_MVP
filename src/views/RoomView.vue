@@ -405,7 +405,7 @@ async function onEndMatch(): Promise<void> {
 .room-header .back {
   color: #9ef0bd;
   text-decoration: none;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .room-header .code {
@@ -425,10 +425,10 @@ async function onEndMatch(): Promise<void> {
 .room-header .status-meta {
   margin-left: 9px;
   color: rgba(234, 245, 238, 0.62);
-  font-size: 11px;
+  font-size: 12px;
 }
 .room-header .connection {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.8;
   white-space: nowrap;
 }

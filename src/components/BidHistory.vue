@@ -232,11 +232,11 @@ function clearCellHint(): void {
   color: #10201b;
 }
 .bid-level {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
 }
 .bid-suit {
-  font-size: 19px;
+  font-size: 23px;
   font-weight: 700;
   line-height: 1;
 }
@@ -244,11 +244,11 @@ function clearCellHint(): void {
   color: #c0392b;
 }
 .bid-suit.nt {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: -0.5px;
 }
 .bid-label {
-  font-size: 12px;
+  font-size: 15px;
   color: #3a4a40;
 }
 .bid-label.final {
@@ -295,9 +295,9 @@ function clearCellHint(): void {
   border-bottom: 1px solid #10241b;
 }
 .variant-table .bid-header span {
-  padding: 5px 0;
+  padding: 6px 0;
   color: #14211c;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
   border-right: 1px solid rgba(16, 36, 27, 0.6);
@@ -314,7 +314,7 @@ function clearCellHint(): void {
   gap: 0;
 }
 .variant-table .bid-cell {
-  min-height: 26px;
+  min-height: 30px;
   padding: 3px 0;
   border-right: 0;
   border-radius: 0;
@@ -325,28 +325,28 @@ function clearCellHint(): void {
   box-shadow: inset 0 0 0 1px rgba(16, 36, 27, 0.25);
 }
 .variant-table .bid-level {
-  font-size: 16px;
+  font-size: 19px;
   color: #10201b;
 }
 .variant-table .bid-suit {
-  font-size: 21px;
+  font-size: 25px;
 }
 .variant-table .bid-suit.red {
   color: #d81b1b;
 }
 .variant-table .bid-suit.nt {
-  font-size: 13px;
+  font-size: 15px;
 }
 .variant-table .bid-label {
-  font-size: 14px;
+  font-size: 16px;
   color: #10201b;
 }
 .variant-table .bid-cell.thinking .bid-label {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
 }
 .variant-table .bid-label.final {
-  font-size: 18px;
+  font-size: 20px;
   color: #10201b;
 }
 .variant-table .muted {

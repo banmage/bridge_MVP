@@ -664,10 +664,10 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
 .seat-profile {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 0 2px;
   color: #eaf5ee;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1.2;
@@ -685,8 +685,8 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   background: #d9a300;
   color: #2c2200;
   border-radius: 3px;
-  padding: 0 4px;
-  font-size: 9px;
+  padding: 0 5px;
+  font-size: 11px;
   font-weight: 700;
   text-shadow: none;
 }
@@ -695,8 +695,8 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   background: #2f8f5b;
   color: #f4fff8;
   border-radius: 3px;
-  padding: 0 4px;
-  font-size: 9px;
+  padding: 0 5px;
+  font-size: 11px;
   font-weight: 700;
   text-shadow: none;
 }
@@ -717,24 +717,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   max-width: 340px;
   min-height: 0;
 }
-/* 手牌在联网牌桌上略微放大，中央空白区域收紧后仍给四家留出完整宽度 */
-.online-table .seat :deep(.hand) {
-  --card-overlap: -74px;
-}
-.online-table .seat :deep(.size-xxl) {
-  --pc-label-size: 23px;
-  --pc-corner-size: 19px;
-  --pc-pip-size: 23px;
-  --pc-court-size: 58px;
-  --pc-back-spade-size: 38px;
-  width: 106px;
-  height: 148px;
-  border-radius: 11px;
-}
-.online-table .seat :deep(.hand-row),
-.online-table .seat :deep(.cards.backs) {
-  min-height: 148px;
-}
+/* 手牌尺寸由 Hand.vue 按窗口宽度统一控制，单机/联网两套牌桌保持一致 */
 /* 左右两块信息与北家手牌上沿平齐：左侧牌局信息，右侧叫牌过程 */
 .play-info-panel,
 .play-bid-history {
@@ -742,21 +725,21 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   top: calc(var(--table-pad) + 14px);
   z-index: 2;
   box-sizing: border-box;
-  width: clamp(188px, 20%, 286px);
+  width: clamp(210px, 21%, 300px);
 }
 .play-info-panel {
   left: var(--table-pad);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 9px 12px;
+  gap: 5px;
+  padding: 11px 14px;
   border-radius: 4px;
   border: 1px solid rgba(80, 66, 26, 0.55);
   background: linear-gradient(180deg, rgba(255, 252, 232, 0.97), rgba(242, 232, 196, 0.96));
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
   color: #2f2a1a;
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.75;
 }
 .info-row {
   display: flex;
@@ -781,7 +764,7 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
 }
 .play-bid-history {
   right: var(--table-pad);
-  max-height: 250px;
+  max-height: 280px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -793,36 +776,36 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   border-radius: 0;
 }
 .play-bid-history :deep(.bid-header span) {
-  padding: 4px 0;
-  font-size: 13px;
+  padding: 5px 0;
+  font-size: 16px;
 }
 .play-bid-history :deep(.bid-cell) {
-  min-height: 24px;
-  padding: 2px 0;
+  min-height: 30px;
+  padding: 3px 0;
 }
 .play-bid-history :deep(.bid-level) {
-  font-size: 15px;
+  font-size: 18px;
 }
 .play-bid-history :deep(.bid-suit) {
-  font-size: 20px;
+  font-size: 25px;
 }
 .play-bid-history :deep(.bid-suit.nt) {
-  font-size: 11px;
+  font-size: 15px;
 }
 .play-bid-history :deep(.bid-label) {
-  font-size: 12px;
+  font-size: 15px;
 }
 .play-bid-history :deep(.bid-scroll) {
-  --bid-scroll-max: 168px;
-  min-height: 168px;
+  --bid-scroll-max: 236px;
+  min-height: 236px;
 }
 /* 叫牌过程按内容高度展示，不随中央区域一起拉高 */
 .center-bid-history {
   flex: 0 1 auto;
   min-height: 0;
-  max-height: 230px;
+  max-height: 270px;
   overflow: hidden;
-  --bid-scroll-max: 172px;
+  --bid-scroll-max: 212px;
 }
 /* 中央叫牌纸采用参考界面的分色表头与较大字号，同时保持紧凑 */
 .center-bid-history :deep(.variant-table) {
@@ -832,27 +815,27 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
 }
 .center-bid-history :deep(.bid-scroll) {
   /* 固定显示 6 轮叫牌，和参考界面的表格高度一致 */
-  min-height: 172px;
+  min-height: 212px;
 }
 .center-bid-history :deep(.bid-header span) {
-  padding: 5px 0;
-  font-size: 15px;
+  padding: 6px 0;
+  font-size: 18px;
 }
 .center-bid-history :deep(.bid-cell) {
-  min-height: 24px;
-  padding: 2px 0;
+  min-height: 30px;
+  padding: 3px 0;
 }
 .center-bid-history :deep(.bid-level) {
-  font-size: 16px;
+  font-size: 19px;
 }
 .center-bid-history :deep(.bid-suit) {
-  font-size: 20px;
+  font-size: 25px;
 }
 .center-bid-history :deep(.bid-suit.nt) {
-  font-size: 12px;
+  font-size: 15px;
 }
 .center-bid-history :deep(.bid-label) {
-  font-size: 13px;
+  font-size: 16px;
 }
 .trick-board {
   flex: 1;
@@ -927,21 +910,6 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   bottom: -6px;
   left: -6px;
 }
-@media (max-width: 1350px) {
-  .online-table .seat :deep(.hand) {
-    --card-overlap: -78px;
-  }
-}
-@media (max-width: 1200px) {
-  .online-table .seat :deep(.hand) {
-    --card-overlap: -84px;
-  }
-}
-@media (max-width: 1000px) {
-  .online-table .seat :deep(.hand) {
-    --card-overlap: -90px;
-  }
-}
 @media (max-width: 900px) {
   .table {
     --table-pad: 8px;
@@ -957,12 +925,9 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   .center {
     max-width: 300px;
   }
-  .online-table .seat :deep(.hand) {
-    --card-overlap: -94px;
-  }
   .center-bid-history {
-    max-height: 210px;
-    --bid-scroll-max: 172px;
+    max-height: 250px;
+    --bid-scroll-max: 212px;
   }
 }
 @media (max-width: 880px) {
@@ -986,9 +951,6 @@ const contractText = computed(() => describeContract(board.value?.contract ?? nu
   .center {
     width: min(100%, 340px);
     max-width: 340px;
-  }
-  .online-table .seat :deep(.hand) {
-    --card-overlap: -76px;
   }
   .play-info-panel,
   .play-bid-history {

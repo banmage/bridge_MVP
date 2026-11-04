@@ -211,7 +211,7 @@ function onRoundSize(value: number): void {
 .back-link {
   color: #9ef0bd;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 15px;
   white-space: nowrap;
 }
 .app-header h1 .suit-black {

@@ -364,10 +364,10 @@ const recommendedCard = computed<number | null>(() => {
 .seat-profile {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 0 2px;
   color: #eaf5ee;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1.2;
@@ -381,8 +381,8 @@ const recommendedCard = computed<number | null>(() => {
   background: #d9a300;
   color: #2c2200;
   border-radius: 3px;
-  padding: 0 4px;
-  font-size: 9px;
+  padding: 0 5px;
+  font-size: 11px;
   font-weight: 700;
   text-shadow: none;
 }
@@ -410,21 +410,21 @@ const recommendedCard = computed<number | null>(() => {
   top: calc(var(--table-pad) + 18px);
   z-index: 2;
   box-sizing: border-box;
-  width: clamp(200px, 22%, 300px);
+  width: clamp(220px, 23%, 320px);
 }
 .play-info-panel {
   left: var(--table-pad);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 9px 12px;
+  gap: 5px;
+  padding: 11px 14px;
   border-radius: 4px;
   border: 1px solid rgba(80, 66, 26, 0.55);
   background: linear-gradient(180deg, rgba(255, 252, 232, 0.97), rgba(242, 232, 196, 0.96));
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
   color: #2f2a1a;
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.75;
 }
 .info-row {
   display: flex;
@@ -449,7 +449,7 @@ const recommendedCard = computed<number | null>(() => {
 }
 .play-bid-history {
   right: var(--table-pad);
-  max-height: 220px;
+  max-height: 260px;
   overflow: hidden;
 }
 .play-bid-history :deep(.variant-table) {
@@ -458,36 +458,36 @@ const recommendedCard = computed<number | null>(() => {
   border-radius: 0;
 }
 .play-bid-history :deep(.bid-header span) {
-  padding: 4px 0;
-  font-size: 13px;
+  padding: 5px 0;
+  font-size: 16px;
 }
 .play-bid-history :deep(.bid-cell) {
-  min-height: 24px;
-  padding: 2px 0;
+  min-height: 30px;
+  padding: 3px 0;
 }
 .play-bid-history :deep(.bid-level) {
-  font-size: 15px;
+  font-size: 18px;
 }
 .play-bid-history :deep(.bid-suit) {
-  font-size: 20px;
+  font-size: 25px;
 }
 .play-bid-history :deep(.bid-suit.nt) {
-  font-size: 11px;
+  font-size: 15px;
 }
 .play-bid-history :deep(.bid-label) {
-  font-size: 12px;
+  font-size: 15px;
 }
 .play-bid-history :deep(.bid-scroll) {
-  --bid-scroll-max: 168px;
-  min-height: 168px;
+  --bid-scroll-max: 218px;
+  min-height: 218px;
 }
 /* 叫牌过程按内容高度展示，不随中央区域一起拉高 */
 .center-bid-history {
   flex: 0 1 auto;
   min-height: 0;
-  max-height: 230px;
+  max-height: 270px;
   overflow: hidden;
-  --bid-scroll-max: 172px;
+  --bid-scroll-max: 212px;
 }
 /* 中央叫牌纸采用参考界面的分色表头与较大字号，同时保持紧凑 */
 .center-bid-history :deep(.variant-table) {
@@ -497,27 +497,27 @@ const recommendedCard = computed<number | null>(() => {
 }
 .center-bid-history :deep(.bid-scroll) {
   /* 固定显示 6 轮叫牌，和参考界面的表格高度一致 */
-  min-height: 172px;
+  min-height: 212px;
 }
 .center-bid-history :deep(.bid-header span) {
-  padding: 5px 0;
-  font-size: 15px;
+  padding: 6px 0;
+  font-size: 18px;
 }
 .center-bid-history :deep(.bid-cell) {
-  min-height: 24px;
-  padding: 2px 0;
+  min-height: 30px;
+  padding: 3px 0;
 }
 .center-bid-history :deep(.bid-level) {
-  font-size: 16px;
+  font-size: 19px;
 }
 .center-bid-history :deep(.bid-suit) {
-  font-size: 20px;
+  font-size: 25px;
 }
 .center-bid-history :deep(.bid-suit.nt) {
-  font-size: 12px;
+  font-size: 15px;
 }
 .center-bid-history :deep(.bid-label) {
-  font-size: 13px;
+  font-size: 16px;
 }
 .trick-board {
   flex: 1;

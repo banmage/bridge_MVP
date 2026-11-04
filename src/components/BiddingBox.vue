@@ -397,8 +397,9 @@ onBeforeUnmount(stopDrag);
 .bidding-popup {
   position: fixed;
   z-index: 4000;
-  width: 344px;
-  padding: 0 8px 8px;
+  width: 392px;
+  max-width: calc(100vw - 16px);
+  padding: 0 10px 10px;
   border: 1px solid #5f6c63;
   border-radius: 6px;
   background: #ededed;
@@ -413,22 +414,22 @@ onBeforeUnmount(stopDrag);
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 -6px 5px;
-  padding: 5px 8px;
+  margin: 0 -8px 6px;
+  padding: 7px 10px;
   border-radius: 5px 5px 0 0;
   background: linear-gradient(180deg, #1d6d49, #12482f);
   color: #eaf5ee;
-  font-size: 12px;
+  font-size: 14px;
   cursor: move;
   touch-action: none;
 }
 .popup-bar strong {
-  font-size: 14px;
+  font-size: 17px;
   letter-spacing: 0.04em;
 }
 .popup-bar span {
   color: rgba(234, 245, 238, 0.62);
-  font-size: 11px;
+  font-size: 12px;
 }
 .popup-bar.dragging {
   cursor: grabbing;
@@ -443,21 +444,21 @@ onBeforeUnmount(stopDrag);
 .bid-grid {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .level-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 3px;
+  gap: 4px;
 }
 .bid-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 31px;
+  gap: 4px;
+  height: 38px;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 5px;
   border: 1px solid #858585;
   border-radius: 0;
   background: #ffff99;
@@ -466,7 +467,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -494,11 +495,11 @@ onBeforeUnmount(stopDrag);
   cursor: not-allowed;
 }
 .bid-level {
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1;
 }
 .bid-suit {
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
 }
@@ -506,7 +507,7 @@ onBeforeUnmount(stopDrag);
   color: #d00000;
 }
 .bid-suit.nt {
-  font-size: 12px;
+  font-size: 15px;
   letter-spacing: -0.4px;
 }
 .bid-btn:disabled .bid-level,
@@ -515,15 +516,15 @@ onBeforeUnmount(stopDrag);
 }
 .bid-combo {
   width: 100%;
-  height: 28px;
-  margin: 4px 0 3px;
-  padding: 0 4px;
+  height: 32px;
+  margin: 5px 0 4px;
+  padding: 0 6px;
   border: 1px solid #7e7e7e;
   border-radius: 0;
   background: #fff;
   color: #000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
 }
 .bid-combo:disabled {
   color: #8f8f8f;
@@ -532,10 +533,10 @@ onBeforeUnmount(stopDrag);
 .special-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
+  gap: 4px;
 }
 .special-btn {
-  height: 31px;
+  height: 38px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -546,7 +547,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -581,11 +582,11 @@ onBeforeUnmount(stopDrag);
 .confirm-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  margin-top: 3px;
+  gap: 4px;
+  margin-top: 4px;
 }
 .confirm-btn {
-  height: 31px;
+  height: 38px;
   min-width: 0;
   padding: 0;
   border: 1px solid #858585;
@@ -596,7 +597,7 @@ onBeforeUnmount(stopDrag);
     inset -1px -1px 0 rgba(120, 120, 120, 0.24);
   color: #000;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
