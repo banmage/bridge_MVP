@@ -98,6 +98,34 @@ describe('Hand 牌面布局', () => {
     expect(wrapper.find('.hint-veil').exists()).toBe(false);
   });
 
+  it('有推荐牌时提示层只服务推荐牌，移到其他牌立即隐藏', async () => {
+    const cards = parseHand('SA H2');
+    const wrapper = mount(Hand, {
+      props: { cards, position: 'S', clickable: true, recommendedCard: cards[0] },
+    });
+    const slots = wrapper.findAll('.card-slot');
+    const recommended = slots.find((item) => item.find('.turn-arrow.variant-card').exists());
+    const other = slots.find((item) => item !== recommended);
+    expect(recommended).toBeTruthy();
+    expect(other).toBeTruthy();
+
+    await recommended!.trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('推荐出牌');
+    await other!.trigger('mouseenter');
+    expect(wrapper.find('.hint-veil').exists()).toBe(false);
+  });
+
+  it('无推荐牌时悬停手牌仍显示牌面说明，离开整手牌后隐藏', async () => {
+    const wrapper = mount(Hand, {
+      props: { cards: parseHand('SA H2'), position: 'S', clickable: true },
+    });
+    const slot = wrapper.get('.card-slot');
+    await slot.trigger('mouseenter');
+    expect(wrapper.get('.hint-veil').text()).toContain('左键选中');
+    await wrapper.get('.hand').trigger('mouseleave');
+    expect(wrapper.find('.hint-veil').exists()).toBe(false);
+  });
+
   it('推荐箭头按显示方位贴在中央侧：上家在下、下家在上、左右家朝向中央', () => {
     const cards = parseHand('SA H2');
     const cases: Array<['north' | 'south' | 'west' | 'east', string]> = [

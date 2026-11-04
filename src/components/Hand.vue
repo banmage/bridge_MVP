@@ -61,7 +61,14 @@ function hoverCard(card: number): void {
   if (props.faceDown) return;
   if (props.recommendedCard === card) {
     hoverText.value = `推荐出牌：${cardLabel(card)}（系统建议，仅辅助）`;
-  } else if (props.clickable) {
+    return;
+  }
+  /* 有推荐时提示层只服务于推荐牌：移到其他牌上立即隐藏，避免看起来像推荐提示没有消失 */
+  if (props.recommendedCard != null) {
+    hoverText.value = null;
+    return;
+  }
+  if (props.clickable) {
     hoverText.value = `${cardLabel(card)} · 左键选中，右键或双击出牌`;
   } else if (props.isDummy) {
     hoverText.value = `${cardLabel(card)}（明手牌）`;
@@ -76,7 +83,11 @@ function clearHint(): void {
 </script>
 
 <template>
-  <div class="hand" :class="[{ 'is-dummy': isDummy, active }, `pos-${position}`]">
+  <div
+    class="hand"
+    :class="[{ 'is-dummy': isDummy, active }, `pos-${position}`]"
+    @mouseleave="clearHint"
+  >
     <TurnArrow v-if="showTurnArrow && recommendedCard == null" :position="arrowPosition" />
     <div class="hand-inner">
       <div v-if="faceDown" class="cards backs">

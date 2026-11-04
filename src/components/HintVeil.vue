@@ -4,7 +4,7 @@
  *
  * 所有叫品、叫牌过程与出牌说明都通过这一层展示：
  * - 白色半透明“薄纱”质感，带轻微模糊；
- * - 固定在牌桌中心偏右，可覆盖叫牌过程右侧空白与右手方部分手牌；
+ * - 固定在中央叫牌/出牌区右侧的空白处，不压住中间区域；
  * - 不接收鼠标事件，鼠标移开后由调用方清空文字即可消失。
  */
 defineProps<{ text?: string | null }>();
@@ -23,13 +23,17 @@ defineProps<{ text?: string | null }>();
 .hint-veil {
   position: fixed;
   top: 38%;
-  left: 50%;
+  /* 停在中央叫牌/出牌区右侧：先让出中央列宽的一半再加间距；
+     窄屏时用视口右边界兜底，避免提示框被挤出屏幕。 */
+  left: min(
+    calc(50% + clamp(160px, 13vw, 180px) + 10px),
+    calc(100vw - min(320px, 32vw) - 12px)
+  );
   z-index: 5000;
   display: flex;
   align-items: flex-start;
   gap: 7px;
   width: min(320px, 32vw);
-  margin-left: 46px;
   padding: 9px 11px;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 5px;
@@ -75,7 +79,6 @@ defineProps<{ text?: string | null }>();
     right: 12px;
     left: auto;
     width: min(280px, 72vw);
-    margin-left: 0;
   }
 }
 </style>
